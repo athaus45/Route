@@ -1,0 +1,1867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECIU Ambassador — Route Challenge</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0D1F35; --panel:#132540; --panel-hi:#1A2F4D;
+  --border:rgba(255,255,255,.09); --border-md:rgba(255,255,255,.16); --border-hi:rgba(255,255,255,.26);
+  --gold:#D4B86A; --gold-lo:rgba(212,184,106,.13);
+  --rust:#C4582E; --rust-lo:rgba(196,88,46,.12);
+  --green:#6ECB8A; --green-lo:rgba(110,203,138,.12);
+  --text:#F2EDE4; --text-md:rgba(242,237,228,.82);
+  --text-dim:rgba(242,237,228,.55); --text-faint:rgba(242,237,228,.30);
+  --c-train:#6ECB8A; --c-flight:#F0A050; --c-ferry:#5BBDE0;
+  --c-car:#96AEBF; --c-walking:#8DC0A0;
+  --r-sm:4px; --r-md:9px; --r-lg:14px;
+  --ease:cubic-bezier(.4,0,.2,1); --t:.22s var(--ease);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--bg);font-family:'Outfit',sans-serif;font-weight:300;
+  color:var(--text);display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;}
+::-webkit-scrollbar{width:3px;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.09);border-radius:2px;}
+
+/* ── ONBOARDING OVERLAY ── */
+#onboarding{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(8,18,32,.95);backdrop-filter:blur(12px);
+  display:flex;align-items:center;justify-content:center;
+}
+.ob-card{
+  background:var(--panel);border:1px solid var(--border-hi);
+  border-radius:var(--r-lg);padding:40px 44px;
+  max-width:520px;width:90%;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);
+  animation:fadeUp .35s var(--ease);
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
+.ob-eyebrow{font-size:9px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:10px;}
+.ob-title{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;
+  line-height:1.2;margin-bottom:6px;}
+.ob-title em{color:var(--rust);font-style:normal;}
+.ob-desc{font-size:12px;color:var(--text-dim);line-height:1.7;margin-bottom:24px;}
+.ob-fields{display:flex;flex-direction:column;gap:12px;margin-bottom:24px;}
+.ob-label{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-dim);margin-bottom:5px;}
+.ob-input{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border-md);
+  border-radius:var(--r-sm);padding:10px 13px;color:var(--text);
+  font-family:'Outfit',sans-serif;font-size:13px;font-weight:300;
+  outline:none;transition:border-color var(--t);}
+.ob-input:focus{border-color:rgba(212,184,106,.45);}
+.ob-input::placeholder{color:var(--text-faint);}
+.ob-select{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border-md);
+  border-radius:var(--r-sm);padding:10px 13px;color:var(--text);
+  font-family:'Outfit',sans-serif;font-size:13px;font-weight:300;
+  outline:none;cursor:pointer;appearance:none;transition:border-color var(--t);}
+.ob-select:focus{border-color:rgba(212,184,106,.45);}
+.ob-select option{background:#132540;color:var(--text);}
+.ob-challenge{
+  background:rgba(110,203,138,.07);border:1px solid rgba(110,203,138,.18);
+  border-radius:var(--r-md);padding:14px 16px;margin-bottom:22px;
+}
+.ob-ch-title{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--green);margin-bottom:8px;}
+.ob-ch-item{display:flex;align-items:flex-start;gap:9px;margin-bottom:7px;font-size:11.5px;color:var(--text-md);line-height:1.5;}
+.ob-ch-item:last-child{margin-bottom:0;}
+.ob-ch-num{width:20px;height:20px;border-radius:50%;background:rgba(110,203,138,.2);
+  border:1px solid rgba(110,203,138,.35);color:var(--green);font-size:10px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.ob-start{width:100%;padding:13px;border-radius:var(--r-md);border:none;
+  background:var(--rust);color:#fff;font-family:'Outfit',sans-serif;
+  font-size:13px;font-weight:500;cursor:pointer;transition:background var(--t);}
+.ob-start:hover{background:#D06030;}
+.ob-start:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── TOP BAR ── */
+#topbar{display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;height:50px;background:var(--panel);
+  border-bottom:1px solid var(--border);flex-shrink:0;z-index:10;position:relative;}
+#topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(212,184,106,.16),transparent);pointer-events:none;}
+.brand{display:flex;align-items:center;gap:11px;}
+.brand-mark{width:32px;height:32px;border:1px solid rgba(196,88,46,.35);border-radius:var(--r-sm);
+  display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--rust-lo);}
+.brand-name{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;}
+.brand-name em{color:var(--gold);font-style:normal;}
+#student-badge{
+  display:flex;align-items:center;gap:8px;
+  padding:4px 13px 4px 10px;
+  background:var(--gold-lo);border:1px solid rgba(212,184,106,.22);
+  border-radius:20px;font-size:11px;color:var(--gold);
+}
+#student-badge .sb-name{font-weight:500;}
+#student-badge .sb-uni{color:rgba(212,184,106,.65);font-size:10px;}
+.topbar-actions{display:flex;align-items:center;gap:5px;}
+.tbtn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--r-sm);
+  border:1px solid var(--border-md);background:transparent;color:var(--text-dim);
+  font-family:'Outfit',sans-serif;font-size:11px;cursor:pointer;transition:all var(--t);}
+.tbtn:hover{background:rgba(255,255,255,.05);border-color:var(--border-hi);color:var(--text);}
+.tbtn.danger{border-color:rgba(196,88,46,.28);color:rgba(210,120,85,.75);}
+.tbtn.danger:hover{background:rgba(196,88,46,.09);color:#D87860;}
+.tbtn.primary{background:var(--rust);border-color:var(--rust);color:#fff;font-weight:500;}
+.tbtn.primary:hover{background:#D06030;}
+
+/* ── LAYOUT ── */
+#main{display:flex;flex:1;overflow:hidden;}
+
+/* ── LEFT PANEL ── */
+#left-panel{width:252px;background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
+.ps{padding:14px 15px 12px;border-bottom:1px solid var(--border);}
+.ps:last-child{border-bottom:none;}
+.ps-label{font-size:8px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--text-dim);margin-bottom:9px;}
+
+/* Route tabs */
+.route-tabs{display:flex;gap:4px;margin-bottom:12px;}
+.rtab{flex:1;padding:8px 6px;border-radius:var(--r-md);border:1px solid var(--border);
+  background:rgba(255,255,255,.02);cursor:pointer;text-align:center;transition:all var(--t);}
+.rtab:hover{background:rgba(255,255,255,.05);}
+.rtab.active{border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.07);}
+.rtab-emoji{font-size:16px;display:block;margin-bottom:2px;}
+.rtab-name{font-size:10.5px;font-weight:500;color:var(--text-md);}
+.rtab-sub{font-size:8px;color:var(--text-faint);margin-top:1px;}
+.rtab.active .rtab-name{color:var(--text);}
+
+/* INSA destination */
+.insa-sel{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border-md);
+  border-radius:var(--r-sm);padding:7px 10px;color:var(--text);
+  font-family:'Outfit',sans-serif;font-size:11.5px;font-weight:300;
+  outline:none;cursor:pointer;appearance:none;transition:border-color var(--t);}
+.insa-sel:focus{border-color:rgba(212,184,106,.35);}
+.insa-sel option{background:#132540;color:var(--text);}
+
+/* Waypoint list */
+.wp-list{list-style:none;}
+.wp-item{display:flex;align-items:center;gap:7px;padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.032);}
+.wp-num{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.06);
+  font-size:9px;font-weight:600;color:var(--text-dim);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.wp-num.start{background:rgba(110,203,138,.18);color:var(--c-train);}
+.wp-num.end{background:rgba(196,88,46,.18);color:#E08060;}
+.wp-city{font-size:11px;font-weight:400;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.wp-badge{font-size:7.5px;padding:2px 5px;border-radius:3px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;}
+.wb-train{background:rgba(110,203,138,.13);color:var(--c-train);}
+.wb-flight{background:rgba(240,160,80,.13);color:var(--c-flight);}
+.wb-ferry{background:rgba(91,189,224,.13);color:var(--c-ferry);}
+.wb-car{background:rgba(150,174,191,.12);color:var(--c-car);}
+.wb-walking{background:rgba(141,192,160,.12);color:var(--c-walking);}
+.wp-del{color:var(--text-faint);cursor:pointer;font-size:13px;padding:2px;transition:color var(--t);flex-shrink:0;}
+.wp-del:hover{color:rgba(210,90,70,.8);}
+
+/* Step hint */
+.step-hint{padding:9px 11px;background:rgba(255,255,255,.025);border:1px solid var(--border);
+  border-radius:var(--r-md);font-size:10.5px;color:var(--text-dim);line-height:1.65;margin-bottom:9px;}
+.step-hint strong{color:var(--text-md);font-weight:500;}
+
+/* Thinking prompts */
+.prompt-card{
+  background:rgba(212,184,106,.06);border:1px solid rgba(212,184,106,.14);
+  border-radius:var(--r-md);padding:11px 12px;margin-top:4px;
+}
+.prompt-title{font-size:8px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:7px;}
+.prompt-q{font-size:10.5px;color:var(--text-dim);line-height:1.6;padding-left:8px;
+  border-left:2px solid rgba(212,184,106,.3);margin-bottom:6px;}
+.prompt-q:last-child{margin-bottom:0;}
+
+/* Legend */
+.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:10px;color:var(--text-md);}
+.leg-line{width:20px;height:2px;border-radius:1px;flex-shrink:0;}
+
+/* ── MAP ── */
+#map-wrap{flex:1;position:relative;overflow:hidden;background:#0D1F35;}
+#map-svg{display:block;cursor:crosshair;}
+#map-wrap::after{content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at center,transparent 60%,rgba(13,31,53,.4) 100%);
+  pointer-events:none;z-index:5;}
+
+/* Snap toggle */
+#snap-toggle{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);z-index:20;
+  display:flex;background:rgba(13,28,50,.96);border:1px solid var(--border-md);
+  border-radius:40px;padding:3px;gap:2px;backdrop-filter:blur(12px);
+  box-shadow:0 6px 24px rgba(0,0,0,.5);}
+.snap-opt{display:flex;align-items:center;gap:6px;padding:5px 15px;border-radius:40px;
+  border:none;background:transparent;color:var(--text-dim);
+  font-family:'Outfit',sans-serif;font-size:10.5px;cursor:pointer;transition:all var(--t);}
+.snap-opt.active{background:rgba(255,255,255,.09);color:var(--text);font-weight:500;}
+
+/* Geo loading */
+#geo-loading{position:absolute;inset:0;z-index:250;display:none;
+  align-items:center;justify-content:center;pointer-events:none;}
+#geo-loading.active{display:flex;}
+.geo-spinner{display:flex;align-items:center;gap:9px;padding:9px 18px;
+  background:rgba(13,28,50,.97);border:1px solid var(--border-hi);border-radius:40px;
+  font-size:11px;color:var(--text-dim);backdrop-filter:blur(12px);}
+@keyframes spinDot{0%{opacity:1}33%{opacity:.2}66%{opacity:.2}100%{opacity:1}}
+.geo-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);}
+.geo-dot:nth-child(1){animation:spinDot 1.2s ease infinite 0s;}
+.geo-dot:nth-child(2){animation:spinDot 1.2s ease infinite .2s;}
+.geo-dot:nth-child(3){animation:spinDot 1.2s ease infinite .4s;}
+
+/* Hover label */
+#hover-label{position:absolute;z-index:15;pointer-events:none;display:none;
+  padding:4px 10px;background:rgba(13,28,50,.94);border:1px solid var(--border-md);
+  border-radius:20px;font-size:10px;color:var(--text-md);transform:translate(12px,-50%);
+  white-space:nowrap;backdrop-filter:blur(8px);}
+
+/* Mode picker */
+#mode-picker{position:absolute;z-index:300;
+  background:linear-gradient(140deg,#102030 0%,#0C1A28 100%);
+  border:1px solid var(--border-hi);border-radius:var(--r-lg);padding:18px;
+  width:330px;
+  max-height:calc(100% - 28px);overflow-y:auto;
+  box-shadow:0 16px 56px rgba(0,0,0,.8);backdrop-filter:blur(16px);display:none;}
+@keyframes mpIn{from{opacity:0;transform:translateY(7px) scale(.97);}to{opacity:1;transform:none;}}
+.mp-visible{animation:mpIn .18s var(--ease);}
+.mp-eyebrow{font-size:8px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--text-faint);margin-bottom:7px;}
+.mp-route{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;
+  color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:7px;line-height:1.2;}
+.mp-route-arrow{color:var(--gold);font-size:12px;flex-shrink:0;}
+/* Thinking prompt inside picker */
+.mp-think{
+  background:rgba(212,184,106,.06);border:1px solid rgba(212,184,106,.14);
+  border-radius:var(--r-sm);padding:8px 11px;margin-bottom:12px;
+  font-size:10px;color:rgba(212,184,106,.8);line-height:1.55;
+}
+.mp-think b{color:var(--gold);}
+.mp-section{font-size:7.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--text-faint);padding:9px 0 5px;border-top:1px solid var(--border);}
+.mp-no-service{padding:8px 10px;background:rgba(91,189,224,.06);
+  border:1px solid rgba(91,189,224,.16);border-radius:var(--r-sm);
+  font-size:10px;color:rgba(170,210,230,.7);line-height:1.5;margin-bottom:8px;}
+.mp-opt{display:flex;align-items:center;padding:10px 11px;border-radius:var(--r-md);
+  cursor:pointer;margin-bottom:5px;border:1px solid var(--border);
+  background:rgba(255,255,255,.02);transition:all var(--t);}
+.mp-opt:last-child{margin-bottom:0;}
+.mp-opt:hover{background:rgba(255,255,255,.052);border-color:var(--border-hi);}
+.mp-opt.mp-train:hover{background:rgba(110,203,138,.08);border-color:rgba(110,203,138,.3);}
+.mp-opt.mp-flight:hover{background:rgba(240,160,80,.08);border-color:rgba(240,160,80,.3);}
+.mp-opt.mp-ferry:hover{background:rgba(91,189,224,.08);border-color:rgba(91,189,224,.3);}
+.mp-opt.mp-car:hover{background:rgba(150,174,191,.07);border-color:rgba(150,174,191,.3);}
+.mp-opt.mp-walking:hover{background:rgba(141,192,160,.07);border-color:rgba(141,192,160,.3);}
+.mp-icon{font-size:19px;width:30px;text-align:center;flex-shrink:0;}
+.mp-body{flex:1;margin:0 9px;}
+.mp-name{font-size:12px;font-weight:500;color:var(--text);margin-bottom:1px;}
+.mp-sub{font-size:9px;color:var(--text-dim);font-style:italic;margin-bottom:3px;}
+.mp-stats{display:flex;flex-wrap:wrap;gap:7px;}
+.mp-stat{font-size:10.5px;color:var(--text-dim);}
+.mp-stat b{font-weight:600;}
+.mp-stat b.g{color:var(--c-train);}
+.mp-stat b.m{color:var(--gold);}
+.mp-stat b.r{color:#E08060;}
+.mp-cancel{margin-top:10px;width:100%;padding:7px;background:transparent;
+  border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-faint);
+  font-family:'Outfit',sans-serif;font-size:10.5px;cursor:pointer;transition:all var(--t);}
+.mp-cancel:hover{background:rgba(255,255,255,.04);color:var(--text-dim);}
+
+
+
+/* Tooltip */
+#tip{position:absolute;background:rgba(8,18,32,.97);border:1px solid var(--border-hi);
+  border-radius:var(--r-md);padding:10px 14px;font-size:12px;color:var(--text);
+  pointer-events:none;opacity:0;transition:opacity .12s;z-index:200;max-width:220px;
+  box-shadow:0 6px 24px rgba(0,0,0,.6);}
+#tip strong{font-family:'Cormorant Garamond',serif;color:var(--gold);display:block;
+  font-size:14px;font-weight:600;margin-bottom:2px;}
+#tip .tip-sub{color:var(--text-dim);font-size:10px;}
+#toast{position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  background:rgba(13,28,50,.97);border:1px solid var(--border-hi);color:var(--text);
+  padding:8px 20px;border-radius:40px;font-size:11.5px;
+  pointer-events:none;opacity:0;transition:opacity .3s;z-index:400;white-space:nowrap;}
+
+/* Zoom */
+#zoom-ctrls{position:absolute;right:14px;bottom:18px;display:flex;flex-direction:column;gap:4px;z-index:20;}
+.zoom-btn{width:32px;height:32px;background:rgba(13,28,50,.96);border:1px solid var(--border-md);
+  border-radius:var(--r-sm);color:var(--text-dim);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all var(--t);
+  font-family:'Outfit',sans-serif;font-weight:200;backdrop-filter:blur(8px);}
+.zoom-btn:hover{background:rgba(255,255,255,.09);color:var(--text);border-color:var(--border-hi);}
+
+/* ── RIGHT PANEL — stats ── */
+#right-panel{width:252px;background:var(--panel);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
+.rp-head{padding:12px 15px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.rp-title{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:600;}
+#rp-badge{font-size:9px;color:var(--text-faint);}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;}
+.stat-cell{padding:12px 13px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+.stat-cell:nth-child(even){border-right:none;}
+.stat-ico{font-size:12px;margin-bottom:3px;opacity:.6;}
+.stat-val{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:var(--text);line-height:1;}
+.stat-unit{font-size:12px;font-family:'Outfit',sans-serif;font-weight:300;color:var(--text-dim);}
+.stat-desc{font-size:8px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--text-dim);margin-top:4px;}
+.co2-sec{padding:12px 15px;border-bottom:1px solid var(--border);}
+.co2-bar-wrap{margin-bottom:8px;}
+.co2-bar-wrap:last-child{margin-bottom:0;}
+.co2-bar-hd{display:flex;justify-content:space-between;margin-bottom:4px;}
+.co2-bar-name{font-size:10px;color:var(--text-md);}
+.co2-bar-val{font-size:10px;font-weight:600;color:var(--text);}
+.co2-bar-track{height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;}
+.co2-bar-fill{height:100%;border-radius:2px;transition:width .55s var(--ease);}
+.save-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(110,203,138,.09);
+  border:1px solid rgba(110,203,138,.2);color:var(--c-train);
+  font-size:9.5px;font-weight:500;padding:4px 10px;border-radius:20px;margin-top:8px;}
+.legs-sec{padding:12px 15px;flex:1;}
+.leg-row{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.035);}
+.leg-row:last-child{border-bottom:none;}
+.leg-cities{font-size:11px;font-weight:300;color:var(--text-md);
+  margin-bottom:3px;display:flex;align-items:center;gap:4px;}
+.leg-arrow{color:var(--text-faint);font-size:9px;}
+.leg-meta{font-size:9.5px;color:var(--text-dim);display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.leg-badge{padding:2px 6px;border-radius:3px;font-size:8px;font-weight:600;text-transform:uppercase;}
+.lb-train{background:rgba(110,203,138,.13);color:var(--c-train);}
+.lb-flight{background:rgba(240,160,80,.13);color:var(--c-flight);}
+.lb-ferry{background:rgba(91,189,224,.13);color:var(--c-ferry);}
+.lb-car{background:rgba(150,174,191,.13);color:var(--c-car);}
+.lb-walking{background:rgba(141,192,160,.13);color:var(--c-walking);}
+.no-route{padding:18px 15px;font-size:10.5px;color:var(--text-dim);font-style:italic;line-height:1.75;}
+.rp-note{padding:11px 15px;background:rgba(110,203,138,.035);border-top:1px solid rgba(110,203,138,.09);
+  font-size:9.5px;color:var(--text-dim);line-height:1.55;}
+.rp-note strong{color:var(--c-train);}
+
+/* Export panel */
+.export-sec{padding:12px 15px;border-top:1px solid var(--border);}
+.export-btn{width:100%;padding:8px;border-radius:var(--r-sm);border:1px solid rgba(212,184,106,.25);
+  background:var(--gold-lo);color:var(--gold);font-family:'Outfit',sans-serif;
+  font-size:11px;font-weight:500;cursor:pointer;transition:all var(--t);margin-bottom:5px;}
+.export-btn:hover{background:rgba(212,184,106,.18);border-color:rgba(212,184,106,.4);}
+
+/* Animations */
+@keyframes dash{to{stroke-dashoffset:-40;}}
+.route-animated{animation:dash 1.8s linear infinite;}
+@keyframes snapPulse{0%{r:6;opacity:.9}100%{r:26;opacity:0}}
+.snap-anim{animation:snapPulse .7s ease-out forwards;}
+
+/* Completion banner */
+#complete-banner{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  background:rgba(110,203,138,.92);color:#fff;padding:8px 22px;
+  border-radius:40px;font-size:11.5px;font-weight:500;
+  pointer-events:none;opacity:0;transition:opacity .4s;z-index:100;white-space:nowrap;
+}
+#complete-banner.visible{opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- ═══ ONBOARDING OVERLAY ════════════════════════════ -->
+<div id="onboarding">
+  <div class="ob-card">
+    <div class="ob-eyebrow">ECIU × INSA — Ambassador Challenge</div>
+    <div class="ob-title">Plan your <em>Green</em> European Journey</div>
+    <div class="ob-desc">You'll build two routes from your university to an INSA campus — manually choosing every city and transport mode along the way. No automatic routing: every decision is yours.</div>
+
+    <div class="ob-challenge">
+      <div class="ob-ch-title">Your two routes</div>
+      <div class="ob-ch-item">
+        <div class="ob-ch-num">1</div>
+        <div><strong style="color:var(--green)">🌿 Eco Route</strong> — Plan the greenest possible journey to your INSA campus. Think trains, ferries, and slow travel.</div>
+      </div>
+      <div class="ob-ch-item">
+        <div class="ob-ch-num">2</div>
+        <div><strong style="color:var(--gold)">✦ Free Choice</strong> — Plan any route you want. It could be the fastest, the most adventurous, or the most creative.</div>
+      </div>
+    </div>
+
+    <div class="ob-fields">
+      <div>
+        <div class="ob-label">Your name</div>
+        <input class="ob-input" id="ob-name" placeholder="First name / Nickname" type="text">
+      </div>
+      <div>
+        <div class="ob-label">Your ECIU University</div>
+        <select class="ob-select" id="ob-uni">
+          <option value="">— Select your university —</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="ob-start" id="ob-btn" onclick="startChallenge()" disabled>
+      Start the challenge →
+    </button>
+  </div>
+</div>
+
+<!-- ═══ TOP BAR ══════════════════════════════════════ -->
+<div id="topbar">
+  <div class="brand">
+    <div class="brand-mark">🌿</div>
+    <div class="brand-name">ECIU <em>×</em> INSA</div>
+    <div style="width:1px;height:16px;background:var(--border-md);margin:0 4px;"></div>
+    <div style="font-size:10px;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;">Ambassador Challenge</div>
+  </div>
+  <div id="student-badge" style="display:none">
+    <span>🎓</span>
+    <div>
+      <div class="sb-name" id="badge-name">—</div>
+      <div class="sb-uni" id="badge-uni">—</div>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="tbtn" onclick="undoLeg()">↩ Undo</button>
+    <button class="tbtn danger" onclick="clearRoute()">✕ Clear</button>
+    <button class="tbtn primary" onclick="saveCurrentRoute()">✓ Save Route</button>
+  </div>
+</div>
+
+<div id="main">
+
+<!-- ═══ LEFT PANEL ════════════════════════════════════ -->
+<div id="left-panel">
+
+  <div class="ps">
+    <div class="ps-label">Your Two Routes</div>
+    <div class="route-tabs">
+      <div class="rtab active" id="tab-eco" onclick="switchRoute('eco')">
+        <span class="rtab-emoji">🌿</span>
+        <div class="rtab-name">Eco Route</div>
+        <div class="rtab-sub">Lowest CO₂</div>
+      </div>
+      <div class="rtab" id="tab-free" onclick="switchRoute('free')">
+        <span class="rtab-emoji">✦</span>
+        <div class="rtab-name" style="color:var(--gold)">Free Choice</div>
+        <div class="rtab-sub">Your pick</div>
+      </div>
+    </div>
+    <div class="ps-label" style="margin-bottom:5px">INSA Destination</div>
+    <select class="insa-sel" id="sel-insa" onchange="onInsaChange()">
+      <option value="">— Choose INSA campus —</option>
+    </select>
+    <div id="mission-status" style="font-size:10px;color:var(--text-dim);margin-top:7px;text-align:center;line-height:1.4;"></div>
+  </div>
+
+  <div class="ps" style="flex:1">
+    <div id="step-hint" class="step-hint"></div>
+    <ul class="wp-list" id="wp-list"></ul>
+  </div>
+
+  <div class="ps">
+    <div class="ps-label">Think before you click</div>
+    <div class="prompt-card" id="prompt-card">
+      <div class="prompt-title" id="prompt-title">🌿 Eco Route</div>
+      <div class="prompt-q" id="prompt-q1"></div>
+      <div class="prompt-q" id="prompt-q2"></div>
+    </div>
+  </div>
+
+  <div class="ps">
+    <div class="ps-label">Legend</div>
+    <div class="legend-item"><div class="leg-line" style="background:var(--c-train)"></div>🚂 Train</div>
+    <div class="legend-item"><div class="leg-line" style="border-top:2px dashed var(--c-flight);background:transparent;"></div>✈️ Flight</div>
+    <div class="legend-item"><div class="leg-line" style="background:var(--c-ferry)"></div>🚢 Ferry</div>
+    <div class="legend-item"><div class="leg-line" style="background:var(--c-car)"></div>🚗 Car</div>
+    <div class="legend-item"><div class="leg-line" style="background:var(--c-walking)"></div>🚶 On foot (if you dare)</div>
+  </div>
+
+</div>
+
+<!-- ═══ MAP ══════════════════════════════════════════ -->
+<div id="map-wrap">
+  <svg id="map-svg"></svg>
+  <div id="tip"></div>
+  <div id="hover-label"></div>
+  <div id="complete-banner">✅ Route complete! Click Save Route.</div>
+  <div id="geo-loading">
+    <div class="geo-spinner">
+      <span class="geo-dot"></span><span class="geo-dot"></span><span class="geo-dot"></span>
+      &ensp;Finding place…
+    </div>
+  </div>
+  <div id="toast"></div>
+  <div id="snap-toggle">
+    <button class="snap-opt active" data-mode="snap" onclick="setSnapMode('snap')">⊕ Snap to Place</button>
+    <button class="snap-opt" data-mode="free" onclick="setSnapMode('free')">✦ Free Pin</button>
+  </div>
+  <div id="mode-picker">
+    <div class="mp-eyebrow">How will you travel?</div>
+    <div class="mp-route" id="mp-from-to"></div>
+    <div id="mp-think-box" class="mp-think"></div>
+    <div id="mp-options"></div>
+    <button class="mp-cancel" onclick="cancelPending()">✕ Cancel this stop</button>
+  </div>
+  <div id="zoom-ctrls">
+    <button class="zoom-btn" onclick="zi()">+</button>
+    <button class="zoom-btn" onclick="zo()">−</button>
+    <button class="zoom-btn" onclick="zr()" style="font-size:11px">⌂</button>
+  </div>
+</div>
+
+<!-- ═══ RIGHT PANEL ═══════════════════════════════════ -->
+<div id="right-panel">
+  <div class="rp-head">
+    <div class="rp-title">Route Stats</div>
+    <div id="rp-badge">—</div>
+  </div>
+  <div id="stats-area">
+    <div class="no-route">Choose your INSA destination, then click the map to add stops one by one.</div>
+  </div>
+  <div class="export-sec">
+    <div class="ps-label" style="margin-bottom:7px">Export for Miro</div>
+    <button class="export-btn" onclick="exportPNG()">📸 Export map as PNG</button>
+    <button class="export-btn" onclick="copyStats()">📋 Copy route summary</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════
+// DATA — same NODES and edge database as the main planner
+// ═══════════════════════════════════════════════════════════
+const NODES={
+  'Aalborg':{lat:57.0488,lon:9.9217},'Dublin':{lat:53.3817,lon:-6.2227},
+  'Enschede':{lat:52.2215,lon:6.8937},'Aveiro':{lat:40.6405,lon:-8.6538},
+  'Tampere':{lat:61.4978,lon:23.7610},'Stavanger':{lat:58.9700,lon:5.7331},
+  'Hamburg':{lat:53.4631,lon:9.9695},'Trento':{lat:46.0748,lon:11.1217},
+  'Linköping':{lat:58.3978,lon:15.5762},'Barcelona':{lat:41.5009,lon:2.1228},
+  'Kaunas':{lat:54.8985,lon:23.9036},'Lodz':{lat:51.7687,lon:19.4573},
+  'Lyon':{lat:45.7640,lon:4.8357},'Toulouse':{lat:43.5647,lon:1.4680},
+  'Rennes':{lat:48.1147,lon:-1.6794},'Rouen':{lat:49.3988,lon:1.0930},
+  'Strasbourg':{lat:48.5734,lon:7.7521},'Blois':{lat:47.5903,lon:1.3389},
+  'Valenciennes':{lat:50.3590,lon:3.5136},
+  'Paris':{lat:48.8566,lon:2.3522},'Brussels':{lat:50.8503,lon:4.3517},
+  'Amsterdam':{lat:52.3676,lon:4.9041},'Cologne':{lat:50.9333,lon:6.9500},
+  'Frankfurt':{lat:50.1109,lon:8.6821},'Munich':{lat:48.1351,lon:11.5820},
+  'Zurich':{lat:47.3769,lon:8.5417},'Basel':{lat:47.5596,lon:7.5886},
+  'Stuttgart':{lat:48.7758,lon:9.1829},'Milan':{lat:45.4654,lon:9.1859},
+  'Vienna':{lat:48.2082,lon:16.3738},'Berlin':{lat:52.5200,lon:13.4050},
+  'Copenhagen':{lat:55.6761,lon:12.5683},'Stockholm':{lat:59.3293,lon:18.0686},
+  'Malmö':{lat:55.6049,lon:13.0038},'Gothenburg':{lat:57.7089,lon:11.9746},
+  'Oslo':{lat:59.9139,lon:10.7522},'Warsaw':{lat:52.2297,lon:21.0122},
+  'Madrid':{lat:40.4168,lon:-3.7038},'Porto':{lat:41.1496,lon:-8.6109},
+  'Lisbon':{lat:38.7223,lon:-9.1393},'Vilnius':{lat:54.6872,lon:25.2797},
+  'Helsinki':{lat:60.1699,lon:24.9384},'Innsbruck':{lat:47.2692,lon:11.4041},
+  'Montpellier':{lat:43.6108,lon:3.8767},'Nantes':{lat:47.2184,lon:-1.5536},
+  'London':{lat:51.5074,lon:-0.1278},'Riga':{lat:56.9460,lon:24.1059},
+  'Tallinn':{lat:59.4370,lon:24.7536},'Budapest':{lat:47.4979,lon:19.0402},
+  'Nuremberg':{lat:49.4521,lon:11.0767},'Bordeaux':{lat:44.8378,lon:-0.5792},
+  'Marseille':{lat:43.2965,lon:5.3698},'Lille':{lat:50.6292,lon:3.0573},
+  'Hannover':{lat:52.3759,lon:9.7320},'Leipzig':{lat:51.3397,lon:12.3731},
+  'Dresden':{lat:51.0504,lon:13.7373},'Prague':{lat:50.0755,lon:14.4378},
+  'Bratislava':{lat:48.1486,lon:17.1077},'Salzburg':{lat:47.8095,lon:13.0550},
+  'Graz':{lat:47.0707,lon:15.4395},'Bern':{lat:46.9480,lon:7.4474},
+  'Geneva':{lat:46.2044,lon:6.1432},'Lausanne':{lat:46.5197,lon:6.6323},
+  'Turin':{lat:45.0703,lon:7.6869},'Rome':{lat:41.9028,lon:12.4964},
+  'Florence':{lat:43.7696,lon:11.2558},'Venice':{lat:45.4408,lon:12.3155},
+  'Bologna':{lat:44.4949,lon:11.3426},'Verona':{lat:45.4384,lon:10.9916},
+  'Holyhead':{lat:53.3086,lon:-4.6315},'Bergen':{lat:60.3913,lon:5.3221},
+  'Turku':{lat:60.4518,lon:22.2666},'Gdansk':{lat:54.3520,lon:18.6466},
+  'Wroclaw':{lat:51.1079,lon:17.0385},'Krakow':{lat:50.0647,lon:19.9450},
+  'Poznan':{lat:52.4064,lon:16.9252},'Mannheim':{lat:49.4875,lon:8.4660},
+  'Karlsruhe':{lat:49.0069,lon:8.4037},'Freiburg':{lat:47.9990,lon:7.8421},
+  'Dijon':{lat:47.3220,lon:5.0415},'Nancy':{lat:48.6921,lon:6.1844},
+  'Perpignan':{lat:42.6887,lon:2.8948},'Zaragoza':{lat:41.6488,lon:-0.8891},
+  'Valencia':{lat:39.4699,lon:-0.3763},'Seville':{lat:37.3891,lon:-5.9845},
+  'Bilbao':{lat:43.2630,lon:-2.9350},'Coimbra':{lat:40.2033,lon:-8.4103},
+  'Grenoble':{lat:45.1885,lon:5.7245},'Nice':{lat:43.7102,lon:7.2620},
+  'Genoa':{lat:44.4056,lon:8.9463},'San Sebastian':{lat:43.3183,lon:-1.9812},
+  'Colmar':{lat:48.0793,lon:7.3585},'Besancon':{lat:47.2378,lon:6.0241},
+  'Chambery':{lat:45.5646,lon:5.9178},'Ljubljana':{lat:46.0569,lon:14.5058},
+  'Zagreb':{lat:45.8150,lon:15.9819},'Padova':{lat:45.4064,lon:11.8768},
+  'Naples':{lat:40.8518,lon:14.2681},'Toulon':{lat:43.1242,lon:5.9280},
+  'Reims':{lat:49.2583,lon:4.0317},'Metz':{lat:49.1193,lon:6.1727},
+  'Luxembourg':{lat:49.6117,lon:6.1319},'Dortmund':{lat:51.5136,lon:7.4653},
+  'Aarhus':{lat:56.1629,lon:10.2039},'Trondheim':{lat:63.4305,lon:10.3951},
+  'Manchester':{lat:53.4808,lon:-2.2426},'Birmingham':{lat:52.4862,lon:-1.8904},
+  'Edinburgh':{lat:55.9533,lon:-3.1883},'Cork':{lat:51.8985,lon:-8.4756},
+  'Ghent':{lat:51.0543,lon:3.7174},'Utrecht':{lat:52.0907,lon:5.1214},
+  'Rotterdam':{lat:51.9244,lon:4.4777},
+};
+
+const RAW_EDGES=[
+  ['Paris','Lyon',465,2.00,42,'train'],['Paris','Marseille',775,3.25,79,'train'],
+  ['Paris','Bordeaux',585,2.08,62,'train'],['Paris','Rennes',373,2.00,41,'train'],
+  ['Paris','Nantes',385,2.10,44,'train'],['Paris','Lille',225,1.00,31,'train'],
+  ['Paris','Strasbourg',490,1.77,59,'train'],['Paris','Toulouse',705,4.33,82,'train'],
+  ['Paris','Montpellier',748,3.25,79,'train'],['Paris','Dijon',315,1.55,39,'train'],
+  ['Paris','Nice',930,5.50,112,'train'],['Paris','Rouen',135,1.25,17,'train'],
+  ['Paris','Blois',185,1.67,19,'train'],['Paris','Valenciennes',213,1.75,23,'train'],
+  ['Paris','Brussels',314,1.37,49,'train'],['Paris','London',495,2.33,109,'train'],
+  ['Paris','Amsterdam',529,3.37,52,'train'],['Paris','Vienna',1245,13.50,79,'train'],
+  ['Paris','Rome',1441,15.50,89,'train'],['Brussels','London',370,2.00,92,'train'],
+  ['Brussels','Amsterdam',210,1.83,25,'train'],['Brussels','Cologne',230,1.83,26,'train'],
+  ['Brussels','Lille',98,0.58,13,'train'],['Amsterdam','Enschede',151,1.75,18,'train'],
+  ['Amsterdam','Frankfurt',497,3.83,54,'train'],['Amsterdam','Hamburg',488,5.00,52,'train'],
+  ['Cologne','Frankfurt',190,1.25,22,'train'],['Cologne','Hamburg',397,3.83,43,'train'],
+  ['Frankfurt','Munich',435,3.25,46,'train'],['Frankfurt','Nuremberg',227,1.10,25,'train'],
+  ['Frankfurt','Stuttgart',224,1.30,25,'train'],['Frankfurt','Berlin',546,4.00,59,'train'],
+  ['Frankfurt','Hannover',351,2.50,37,'train'],['Frankfurt','Mannheim',77,0.48,10,'train'],
+  ['Mannheim','Karlsruhe',22,0.17,10,'train'],['Karlsruhe','Freiburg',110,0.75,13,'train'],
+  ['Karlsruhe','Basel',104,0.83,12,'train'],['Karlsruhe','Strasbourg',80,0.75,11,'train'],
+  ['Freiburg','Basel',72,0.50,10,'train'],['Strasbourg','Basel',82,0.75,10,'train'],
+  ['Strasbourg','Nancy',147,1.33,16,'train'],['Stuttgart','Munich',250,2.25,28,'train'],
+  ['Munich','Nuremberg',171,1.08,19,'train'],['Munich','Innsbruck',157,1.75,19,'train'],
+  ['Munich','Salzburg',156,1.50,18,'train'],['Munich','Vienna',427,3.92,45,'train'],
+  ['Munich','Berlin',584,4.42,62,'train'],['Munich','Zurich',328,3.58,35,'train'],
+  ['Munich','Rome',1019,11.75,65,'train'],['Hamburg','Berlin',286,1.75,32,'train'],
+  ['Hamburg','Hannover',151,1.25,17,'train'],['Hamburg','Copenhagen',431,5.00,47,'train'],
+  ['Berlin','Hannover',283,1.75,31,'train'],['Berlin','Leipzig',186,1.25,20,'train'],
+  ['Berlin','Dresden',193,2.00,22,'train'],['Berlin','Warsaw',573,5.42,59,'train'],
+  ['Berlin','Prague',352,4.67,38,'train'],['Berlin','Copenhagen',380,5.25,41,'train'],
+  ['Berlin','Vienna',681,9.50,45,'train'],['Leipzig','Dresden',114,1.25,13,'train'],
+  ['Leipzig','Nuremberg',264,2.17,28,'train'],['Dresden','Prague',157,2.25,17,'train'],
+  ['Nuremberg','Vienna',445,4.17,47,'train'],['Poznan','Berlin',292,3.00,31,'train'],
+  ['Wroclaw','Berlin',359,3.92,38,'train'],['Basel','Zurich',85,0.83,11,'train'],
+  ['Basel','Bern',93,0.92,12,'train'],['Zurich','Bern',128,1.00,15,'train'],
+  ['Zurich','Geneva',286,2.83,31,'train'],['Zurich','Lausanne',232,2.25,25,'train'],
+  ['Zurich','Innsbruck',254,3.25,28,'train'],['Zurich','Milan',390,3.50,43,'train'],
+  ['Zurich','Munich',328,3.58,35,'train'],['Bern','Geneva',158,1.67,18,'train'],
+  ['Geneva','Lausanne',64,0.50,10,'train'],['Geneva','Lyon',157,2.00,18,'train'],
+  ['Lausanne','Milan',352,3.75,38,'train'],['Vienna','Salzburg',295,2.50,32,'train'],
+  ['Vienna','Graz',198,2.58,22,'train'],['Vienna','Budapest',249,2.75,27,'train'],
+  ['Vienna','Prague',330,4.00,35,'train'],['Vienna','Bratislava',63,1.00,10,'train'],
+  ['Vienna','Hamburg',900,12.50,58,'train'],['Salzburg','Innsbruck',186,2.00,20,'train'],
+  ['Innsbruck','Trento',135,1.83,15,'train'],['Innsbruck','Verona',246,3.25,27,'train'],
+  ['Bratislava','Budapest',200,2.75,21,'train'],['Budapest','Warsaw',725,8.00,77,'train'],
+  ['Budapest','Krakow',440,5.42,46,'train'],['Prague','Nuremberg',372,3.83,40,'train'],
+  ['Prague','Vienna',330,4.00,35,'train'],['Prague','Munich',380,3.58,40,'train'],
+  ['Prague','Wroclaw',280,3.58,30,'train'],['Milan','Turin',140,1.00,20,'train'],
+  ['Milan','Venice',268,2.33,36,'train'],['Milan','Bologna',210,1.00,29,'train'],
+  ['Milan','Florence',302,1.75,40,'train'],['Milan','Rome',572,3.00,75,'train'],
+  ['Milan','Verona',161,1.08,22,'train'],['Venice','Verona',98,1.12,15,'train'],
+  ['Venice','Bologna',152,1.08,22,'train'],['Venice','Trento',184,1.92,20,'train'],
+  ['Verona','Trento',98,1.08,12,'train'],['Bologna','Florence',105,0.67,16,'train'],
+  ['Bologna','Rome',362,2.00,49,'train'],['Florence','Rome',280,1.50,38,'train'],
+  ['Turin','Lyon',295,5.50,32,'train'],['Turin','Geneva',291,5.33,31,'train'],
+  ['Lyon','Marseille',315,1.67,41,'train'],['Lyon','Montpellier',304,1.50,40,'train'],
+  ['Lyon','Grenoble',101,1.25,12,'train'],['Lyon','Dijon',191,2.00,21,'train'],
+  ['Lyon','Geneva',158,2.00,18,'train'],['Lyon','Turin',295,5.50,32,'train'],
+  ['Lyon','Toulouse',535,5.00,55,'train'],['Bordeaux','Toulouse',246,2.17,27,'train'],
+  ['Bordeaux','Nantes',390,3.83,41,'train'],['Toulouse','Montpellier',245,1.58,26,'train'],
+  ['Toulouse','Perpignan',188,1.67,20,'train'],['Perpignan','Barcelona',176,1.58,23,'train'],
+  ['Montpellier','Marseille',170,1.42,18,'train'],['Marseille','Nice',200,2.50,22,'train'],
+  ['Nantes','Rennes',110,1.25,13,'train'],['Stockholm','Gothenburg',455,3.00,48,'train'],
+  ['Stockholm','Malmö',617,4.75,65,'train'],['Stockholm','Linköping',200,2.00,21,'train'],
+  ['Stockholm','Oslo',621,6.00,65,'train'],['Gothenburg','Oslo',292,4.00,31,'train'],
+  ['Gothenburg','Malmö',286,3.08,31,'train'],['Malmö','Copenhagen',16,0.33,10,'train'],
+  ['Copenhagen','Aalborg',332,3.00,35,'train'],['Copenhagen','Hamburg',431,5.00,47,'train'],
+  ['Oslo','Stavanger',542,8.00,57,'train'],['Oslo','Bergen',496,6.67,53,'train'],
+  ['Helsinki','Tampere',187,1.83,20,'train'],['Helsinki','Turku',193,2.00,21,'train'],
+  ['Tallinn','Riga',308,4.50,33,'train'],['Riga','Vilnius',297,3.75,32,'train'],
+  ['Vilnius','Kaunas',100,1.42,12,'train'],['Vilnius','Warsaw',533,9.50,57,'train'],
+  ['Kaunas','Warsaw',441,8.50,46,'train'],['London','Holyhead',425,3.50,45,'train'],
+  ['Barcelona','Madrid',621,2.50,79,'train'],['Barcelona','Valencia',352,3.13,47,'train'],
+  ['Barcelona','Zaragoza',296,1.67,40,'train'],['Barcelona','Lyon',650,5.50,68,'train'],
+  ['Madrid','Valencia',390,1.75,52,'train'],['Madrid','Seville',528,2.42,71,'train'],
+  ['Madrid','Bilbao',395,4.67,42,'train'],['Madrid','Lisbon',645,10.00,68,'train'],
+  ['Bilbao','Bordeaux',215,3.00,23,'train'],['Porto','Aveiro',68,0.67,10,'train'],
+  ['Porto','Lisbon',313,2.92,34,'train'],['Porto','Coimbra',122,1.00,14,'train'],
+  ['Coimbra','Lisbon',200,2.00,21,'train'],['Lisbon','Seville',440,5.33,46,'train'],
+  ['Warsaw','Lodz',130,1.42,14,'train'],['Warsaw','Krakow',295,2.92,32,'train'],
+  ['Warsaw','Gdansk',340,3.25,36,'train'],['Warsaw','Wroclaw',350,3.58,37,'train'],
+  ['Warsaw','Poznan',307,3.08,33,'train'],['Wroclaw','Krakow',270,3.25,29,'train'],
+  ['Krakow','Budapest',440,5.42,46,'train'],
+  // ── ECIU cities → major hubs (filling audit gaps) ──────
+  // Aalborg
+  ['Aalborg','Hamburg',390,4.50,40,'train'],
+  ['Aalborg','Berlin',530,5.50,54,'train'],
+  ['Aalborg','Oslo',630,7.50,65,'train'],
+  // Enschede
+  ['Enschede','Brussels',210,2.50,26,'train'],
+  ['Enschede','Cologne',170,2.00,22,'train'],
+  ['Enschede','Frankfurt',350,3.50,38,'train'],
+  ['Enschede','Berlin',510,5.50,52,'train'],
+  // Hamburg (more connections)
+  ['Hamburg','Frankfurt',490,3.83,50,'train'],
+  ['Hamburg','Brussels',490,4.50,52,'train'],
+  ['Hamburg','Vienna',900,12.00,58,'train'],
+  // Linköping
+  ['Linköping','Copenhagen',450,4.50,48,'train'],
+  ['Linköping','Oslo',740,7.50,76,'train'],
+  ['Linköping','Gothenburg',300,2.83,31,'train'],
+  // Tampere
+  ['Tampere','Turku',165,2.00,18,'train'],
+  ['Tampere','Stockholm',800,12.00,85,'ferry'],
+  // Stavanger
+  ['Stavanger','Bergen',210,2.50,23,'train'],
+  ['Stavanger','Gothenburg',370,4.50,40,'ferry'],
+  // Kaunas
+  ['Kaunas','Riga',270,3.50,28,'train'],
+  ['Kaunas','Berlin',1050,14.00,58,'train'],
+  // Lodz
+  ['Lodz','Berlin',540,5.50,55,'train'],
+  ['Lodz','Prague',440,5.00,45,'train'],
+  ['Lodz','Krakow',220,2.50,23,'train'],
+  // Aveiro
+  ['Aveiro','Madrid',680,7.50,70,'train'],
+  ['Aveiro','Porto',68,0.67,10,'train'],
+  // Trento
+  ['Trento','Bologna',220,2.25,24,'train'],
+  ['Trento','Innsbruck',135,1.83,15,'train'],
+  ['Trento','Vienna',620,7.00,58,'train'],
+  // Barcelona
+  ['Barcelona','Marseille',510,4.50,55,'train'],
+  ['Barcelona','Rome',1800,13.00,92,'train'],
+  // Dublin
+  ['Dublin','Holyhead',120,3.50,41,'ferry'],
+  // ── Missing routes ──────────────────────────────────────
+  // Toulouse
+  ['Toulouse','Marseille',405,4.50,42,'train'],
+  ['Toulouse','Barcelona',330,3.25,35,'train'],
+  // Lyon
+  ['Lyon','Strasbourg',490,3.83,49,'train'],
+  ['Lyon','Milan',470,3.42,52,'train'],
+  ['Lyon','Bordeaux',554,3.83,56,'train'],
+  // Rennes
+  ['Rennes','Bordeaux',490,3.17,50,'train'],
+  // Rouen
+  ['Rouen','Lille',145,1.50,22,'train'],
+  // Strasbourg
+  ['Strasbourg','Frankfurt',220,2.08,28,'train'],
+  ['Strasbourg','Mulhouse',108,1.00,13,'train'],
+  // Valenciennes
+  ['Valenciennes','Brussels',130,1.08,17,'train'],
+  ['Valenciennes','Lille',55,0.50,9,'train'],
+  // Blois
+  ['Blois','Tours',53,0.50,9,'train'],
+  ['Blois','Bordeaux',345,2.25,40,'train'],
+  // Aveiro
+  ['Aveiro','Lisbon',255,2.50,25,'train'],
+  // Trento
+  ['Trento','Milan',258,2.50,28,'train'],
+  // Dublin — train+ferry to London via Holyhead already in edges
+  // Nice
+  ['Nice','Genoa',190,3.17,22,'train'],
+  // Other useful regional links
+  ['Lyon','Nice',470,3.67,48,'train'],
+  ['Marseille','Toulon',65,0.50,9,'train'],
+  ['Nantes','Bordeaux',390,3.83,41,'train'],
+  ['Bordeaux','Toulouse',246,2.17,27,'train'],  // duplicate-safe (edgeMap dedupes)
+  ['Bilbao','San Sebastian',102,1.00,12,'train'],
+  ['San Sebastian','Bordeaux',230,3.25,24,'train'],
+  ['Genoa','Milan',150,1.50,17,'train'],
+  ['Genoa','Nice',190,3.17,22,'train'],
+  // ── Missing routes (comprehensive fix) ──────────────────
+
+  // Poland — Lodz missing connections
+  ['Lodz','Poznan',187,2.17,19,'train'],
+  ['Lodz','Wroclaw',213,2.58,22,'train'],
+  ['Lodz','Krakow',237,2.83,24,'train'],
+  // Poland — Gdansk connections
+  ['Gdansk','Berlin',480,5.17,48,'train'],
+  ['Gdansk','Poznan',309,3.25,31,'train'],
+  // Poland — Wroclaw
+  ['Wroclaw','Poznan',174,2.17,18,'train'],
+  // Baltics — Tallinn extra
+  ['Tallinn','Helsinki',80,2.5,35,'train'],  // ferry coded as train type
+
+  // Iberia — Zaragoza
+  ['Zaragoza','Madrid',325,1.67,35,'train'],
+  ['Zaragoza','Valencia',330,1.75,32,'train'],
+  ['Zaragoza','Bilbao',305,3.75,31,'train'],
+  // Iberia — extra links
+  ['San Sebastian','Bordeaux',230,3.25,24,'train'],
+
+  // Germany — missing ICE/IC
+  ['Hannover','Cologne',250,2.17,25,'train'],
+  ['Leipzig','Frankfurt',390,3.25,40,'train'],
+  ['Nuremberg','Berlin',440,4.00,45,'train'],
+  ['Stuttgart','Basel',185,1.42,19,'train'],
+  ['Stuttgart','Zurich',255,2.50,26,'train'],
+  ['Stuttgart','Cologne',360,3.25,37,'train'],
+  ['Cologne','Munich',580,4.58,59,'train'],
+  ['Cologne','Brussels',210,1.83,22,'train'],
+  ['Hannover','Dresden',320,2.92,33,'train'],
+  // Mulhouse proper connections
+  ['Mulhouse','Basel',38,0.33,9,'train'],
+  ['Mulhouse','Freiburg',52,0.50,9,'train'],
+  ['Mulhouse','Colmar',23,0.25,9,'train'],
+
+  // France — extra regional
+  ['Marseille','Toulon',65,0.50,9,'train'],
+  ['Marseille','Montpellier',170,1.42,17,'train'],
+  ['Nantes','Tours',130,1.25,14,'train'],
+  ['Tours','Bordeaux',348,2.33,36,'train'],
+  ['Tours','Paris',236,1.25,23,'train'],  // already exists, deduped
+  ['Dijon','Besancon',95,0.83,11,'train'],
+  ['Dijon','Strasbourg',335,2.83,34,'train'],
+  ['Grenoble','Chambery',58,0.75,9,'train'],
+  ['Chambery','Lyon',100,1.17,12,'train'],
+  ['Chambery','Turin',160,2.17,17,'train'],
+  ['Perpignan','Montpellier',195,1.75,20,'train'],
+
+  // Switzerland
+  ['Lausanne','Geneva',64,0.50,9,'train'],  // duplicate-safe
+  ['Bern','Lausanne',104,0.92,12,'train'],
+
+  // Italy — more connections
+  ['Turin','Genoa',170,1.83,18,'train'],
+  ['Florence','Bologna',105,0.67,15,'train'],  // duplicate-safe
+  ['Rome','Naples',225,1.25,29,'train'],
+  ['Naples','Rome',225,1.25,29,'train'],
+  ['Venice','Padova',35,0.37,9,'train'],
+  ['Padova','Bologna',120,1.00,13,'train'],
+  ['Milan','Zurich',390,3.50,43,'train'],  // duplicate-safe
+
+  // Austria / Eastern Europe
+  ['Vienna','Ljubljana',380,6.00,38,'train'],
+  ['Ljubljana','Venice',240,3.75,29,'train'],
+  ['Ljubljana','Zagreb',140,2.25,15,'train'],
+  ['Zagreb','Budapest',290,2.75,29,'train'],
+  ['Budapest','Vienna',249,2.75,27,'train'],  // duplicate-safe
+  ['Graz','Ljubljana',190,3.00,19,'train'],
+  ['Salzburg','Zurich',290,4.00,30,'train'],
+
+  // Scandinavia extra
+  ['Gothenburg','Malmö',286,3.08,29,'train'],  // duplicate-safe
+  ['Copenhagen','Stockholm',650,5.50,65,'train'],
+  ['Aalborg','Aarhus',110,1.25,14,'train'],
+  ['Aarhus','Copenhagen',290,3.00,32,'train'],
+  ['Oslo','Trondheim',550,6.67,55,'train'],
+
+  // France — missing Paris connections
+  ['Paris','Nancy',365,2.50,36,'train'],
+  ['Paris','Metz',332,2.17,35,'train'],
+  ['Paris','Reims',143,0.67,14,'train'],
+  ['Paris','Tours',236,1.25,23,'train'],
+
+  // Nancy / Metz / Luxembourg
+  ['Nancy','Metz',55,0.50,9,'train'],
+  ['Metz','Luxembourg',62,0.75,12,'train'],
+  ['Metz','Saarbrücken',60,0.75,11,'train'],
+  ['Luxembourg','Brussels',218,2.75,26,'train'],
+  ['Luxembourg','Frankfurt',270,3.25,33,'train'],
+  ['Luxembourg','Strasbourg',150,2.00,19,'train'],
+
+  // Grenoble
+  ['Grenoble','Marseille',310,3.17,32,'train'],
+  ['Grenoble','Turin',175,2.75,23,'train'],
+
+  // Graz
+  ['Graz','Salzburg',290,3.17,30,'train'],
+
+  // Enschede — NL/DE connections
+  ['Enschede','Utrecht',158,1.67,18,'train'],
+  ['Enschede','Rotterdam',212,2.17,23,'train'],
+  ['Enschede','Dortmund',110,1.33,16,'train'],
+  ['Dortmund','Cologne',95,1.00,14,'train'],
+  ['Dortmund','Hamburg',270,2.67,29,'train'],
+  ['Dortmund','Frankfurt',280,2.42,30,'train'],
+  ['Utrecht','Amsterdam',40,0.33,9,'train'],
+  ['Utrecht','Rotterdam',62,0.50,10,'train'],
+  ['Rotterdam','Amsterdam',85,0.67,11,'train'],
+  ['Ghent','Brussels',55,0.50,9,'train'],
+  ['Ghent','Bruges',25,0.25,9,'train'],
+
+  // UK
+  ['London','Manchester',320,2.17,35,'train'],
+  ['London','Birmingham',185,1.33,28,'train'],
+  ['London','Edinburgh',635,4.50,55,'train'],
+  ['Manchester','Edinburgh',345,3.25,38,'train'],
+  ['Manchester','Birmingham',145,1.25,22,'train'],
+
+  // Ireland
+  ['Dublin','Cork',265,2.50,22,'train'],
+  ['Dublin','Galway',210,2.25,24,'train'],
+
+  // Lodz extra Polish connections
+  ['Lodz','Wroclaw',210,2.50,22,'train'],
+  ['Lodz','Poznan',225,2.33,23,'train'],
+
+  // Ferries
+  ['Helsinki','Tallinn',83,2.5,42,'ferry'],['Helsinki','Stockholm',404,16.5,95,'ferry'],
+  ['Tallinn','Stockholm',430,17.5,88,'ferry'],['Turku','Stockholm',560,11.0,79,'ferry'],
+  ['Holyhead','Dublin',120,3.5,41,'ferry'],['Gothenburg','Kiel',340,14.0,89,'ferry'],
+  ['Copenhagen','Oslo',590,16.5,109,'ferry'],
+  // Flights
+  ['Dublin','London',450,3.6,49,'flight'],['Dublin','Paris',903,4.2,64,'flight'],
+  ['Dublin','Amsterdam',926,4.2,62,'flight'],['Dublin','Barcelona',1794,5.4,69,'flight'],
+  ['Dublin','Madrid',1820,5.4,74,'flight'],['Dublin','Rome',2280,6.0,84,'flight'],
+  ['Dublin','Frankfurt',1580,5.1,76,'flight'],['Tampere','Frankfurt',1780,5.4,74,'flight'],
+  ['Tampere','Amsterdam',1790,5.4,76,'flight'],['Tampere','London',1885,5.5,82,'flight'],
+  ['Helsinki','Stockholm',396,3.5,54,'flight'],['Helsinki','London',1851,5.5,82,'flight'],
+  ['Helsinki','Paris',2271,6.0,92,'flight'],['Helsinki','Frankfurt',1782,5.4,76,'flight'],
+  ['Stavanger','London',1170,4.6,66,'flight'],['Stavanger','Amsterdam',1020,4.4,62,'flight'],
+  ['Stavanger','Copenhagen',860,4.1,56,'flight'],['Stavanger','Paris',1570,5.1,80,'flight'],
+  ['Aalborg','Copenhagen',325,3.4,46,'flight'],['Aalborg','London',1080,4.4,66,'flight'],
+  ['Kaunas','London',1825,5.4,34,'flight'],['Kaunas','Brussels',1560,5.1,32,'flight'],
+  ['Kaunas','Paris',1890,5.5,39,'flight'],['Kaunas','Barcelona',2420,6.2,50,'flight'],
+  ['Kaunas','Rome',2230,6.0,42,'flight'],['Kaunas','Frankfurt',1560,5.1,42,'flight'],
+  ['Kaunas','Amsterdam',1680,5.2,39,'flight'],['Kaunas','Oslo',1440,4.9,42,'flight'],
+  ['Kaunas','Stockholm',1350,4.8,39,'flight'],['Lodz','London',1680,5.2,36,'flight'],
+  ['Lodz','Brussels',1430,4.9,32,'flight'],['Lodz','Barcelona',2120,5.8,46,'flight'],
+  ['Lodz','Paris',1700,5.3,39,'flight'],['Lodz','Frankfurt',1320,4.8,39,'flight'],
+  ['Lodz','Amsterdam',1450,4.9,42,'flight'],['Lodz','Rome',2000,5.7,42,'flight'],
+  ['Barcelona','London',1575,5.1,62,'flight'],['Barcelona','Amsterdam',1537,5.0,62,'flight'],
+  ['Barcelona','Frankfurt',1489,5.0,66,'flight'],['Barcelona','Rome',1390,4.9,62,'flight'],
+  ['Barcelona','Oslo',2450,6.3,92,'flight'],['Barcelona','Stockholm',2430,6.2,92,'flight'],
+  ['Hamburg','London',930,4.2,69,'flight'],['Hamburg','Madrid',1980,5.6,94,'flight'],
+  ['Hamburg','Barcelona',2020,5.7,92,'flight'],['Hamburg','Rome',1690,5.3,82,'flight'],
+  ['Milan','London',1275,4.7,72,'flight'],['Milan','Madrid',1640,5.2,76,'flight'],
+  ['Milan','Barcelona',960,4.3,64,'flight'],['Milan','Amsterdam',1270,4.7,69,'flight'],
+  ['London','Amsterdam',370,3.5,62,'flight'],['London','Paris',450,3.6,66,'flight'],
+  ['London','Frankfurt',900,4.2,72,'flight'],['London','Madrid',1265,4.7,72,'flight'],
+  ['London','Barcelona',1580,5.1,66,'flight'],['London','Rome',1892,5.5,76,'flight'],
+  ['London','Warsaw',1452,4.9,69,'flight'],['London','Stockholm',1740,5.3,84,'flight'],
+  ['London','Oslo',1842,5.5,86,'flight'],['London','Lisbon',1739,5.3,76,'flight'],
+  ['Paris','Madrid',1270,4.7,72,'flight'],['Paris','Rome',1892,5.5,76,'flight'],
+  ['Paris','Barcelona',1139,4.5,66,'flight'],['Paris','Warsaw',1847,5.5,84,'flight'],
+  ['Paris','Oslo',2000,5.7,92,'flight'],['Paris','Stockholm',2100,5.8,94,'flight'],
+  ['Amsterdam','Barcelona',1540,5.0,66,'flight'],['Amsterdam','Rome',1872,5.5,76,'flight'],
+  ['Amsterdam','Madrid',1757,5.3,74,'flight'],['Amsterdam','Warsaw',1159,4.5,62,'flight'],
+  ['Amsterdam','Oslo',1165,4.5,66,'flight'],['Amsterdam','Stockholm',1256,4.7,69,'flight'],
+  ['Frankfurt','Madrid',1820,5.4,84,'flight'],['Frankfurt','Barcelona',1490,5.0,72,'flight'],
+  ['Frankfurt','Rome',1540,5.0,72,'flight'],['Frankfurt','Warsaw',1276,4.7,66,'flight'],
+  ['Frankfurt','Oslo',1694,5.3,84,'flight'],['Frankfurt','Stockholm',1524,5.0,76,'flight'],
+  ['Porto','London',1710,5.3,62,'flight'],['Porto','Paris',1640,5.2,62,'flight'],
+  ['Porto','Madrid',380,3.5,49,'flight'],['Madrid','Rome',1964,5.6,80,'flight'],
+  ['Madrid','Amsterdam',1757,5.3,76,'flight'],['Warsaw','London',1452,4.9,64,'flight'],
+  ['Warsaw','Paris',1847,5.5,76,'flight'],['Warsaw','Amsterdam',1159,4.5,59,'flight'],
+  ['Warsaw','Rome',1980,5.6,80,'flight'],['Warsaw','Barcelona',2420,6.2,86,'flight'],
+  ['Warsaw','Oslo',1410,4.9,69,'flight'],['Warsaw','Stockholm',1152,4.5,62,'flight'],
+  // Toulouse (TLS) — Volotea, easyJet, Transavia hub
+  ['Toulouse','London',1140,4.5,62,'flight'],['Toulouse','Paris',590,3.6,58,'flight'],
+  ['Toulouse','Amsterdam',1360,4.8,68,'flight'],['Toulouse','Brussels',1120,4.5,60,'flight'],
+  ['Toulouse','Rome',1380,4.8,72,'flight'],['Toulouse','Madrid',950,4.3,54,'flight'],
+  ['Toulouse','Lisbon',1430,4.9,66,'flight'],['Toulouse','Oslo',2280,6.1,88,'flight'],
+  ['Toulouse','Stockholm',2200,6.0,88,'flight'],['Toulouse','Frankfurt',1290,4.7,72,'flight'],
+  // Lyon (LYS) — hub for Air France/easyJet
+  ['Lyon','London',860,4.2,58,'flight'],['Lyon','Amsterdam',1060,4.4,62,'flight'],
+  ['Lyon','Brussels',870,4.2,55,'flight'],['Lyon','Madrid',1230,4.7,66,'flight'],
+  ['Lyon','Rome',880,4.2,60,'flight'],['Lyon','Lisbon',1660,5.2,72,'flight'],
+  ['Lyon','Oslo',2010,5.7,88,'flight'],['Lyon','Stockholm',1940,5.6,88,'flight'],
+  // Marseille (MRS)
+  ['Marseille','London',1050,4.4,62,'flight'],['Marseille','Amsterdam',1300,4.7,66,'flight'],
+  ['Marseille','Brussels',1100,4.5,60,'flight'],['Marseille','Rome',700,3.9,52,'flight'],
+  // Bordeaux (BOD)
+  ['Bordeaux','London',870,4.2,58,'flight'],['Bordeaux','Amsterdam',1150,4.6,64,'flight'],
+  ['Bordeaux','Brussels',950,4.3,58,'flight'],['Bordeaux','Rome',1490,5.0,72,'flight'],
+  // Nice (NCE)
+  ['Nice','London',1200,4.6,64,'flight'],['Nice','Amsterdam',1380,4.8,68,'flight'],
+  ['Nice','Brussels',1150,4.5,60,'flight'],['Nice','Rome',520,3.7,48,'flight'],
+  // Rennes / Strasbourg / Nantes via Paris are practical (connections)
+  // Trento uses Milan airports
+  ['Trento','London',1275,4.7,72,'flight'],['Trento','Amsterdam',1270,4.7,69,'flight'],
+  ['Trento','Frankfurt',1540,5.0,68,'flight'],['Trento','Paris',1030,4.4,64,'flight'],
+  // Aveiro uses Porto/Lisbon
+  ['Aveiro','London',1710,5.3,62,'flight'],['Aveiro','Paris',1640,5.2,62,'flight'],
+  ['Aveiro','Amsterdam',2000,5.7,72,'flight'],['Aveiro','Frankfurt',2040,5.7,72,'flight'],
+];
+
+const CO2={train:0.035,flight:0.255,ferry:0.120,car:0.171,walking:0};
+const edgeMap={};
+RAW_EDGES.forEach(([a,b,km,h,price,mode])=>{
+  if(!NODES[a]||!NODES[b]) return;
+  const co2=Math.round(km*(CO2[mode]||0));
+  const e={km,hours:h,price,co2};
+  [a,b].forEach((from,i)=>{
+    const to=[b,a][i];
+    if(!edgeMap[from]) edgeMap[from]={};
+    if(!edgeMap[from][to]) edgeMap[from][to]={};
+    if(!edgeMap[from][to][mode]||edgeMap[from][to][mode].price>price)
+      edgeMap[from][to][mode]=e;
+  });
+});
+
+function getEdge(from,to,mode){return(edgeMap[from]&&edgeMap[from][to]&&edgeMap[from][to][mode])||null;}
+function getNodeCoords(n){return NODES[n]||dynamicNodes[n]||customNodes[n]||null;}
+
+function getCarData(from,to){
+  const a=getNodeCoords(from),b=getNodeCoords(to); if(!a||!b) return null;
+  const km=Math.round(hav(a.lat,a.lon,b.lat,b.lon)*1.28);
+  return{km,hours:parseFloat((km/85).toFixed(1)),price:Math.round(km*0.14),co2:Math.round(km*CO2.car)};
+}
+function getWalkingData(from,to){
+  const a=getNodeCoords(from),b=getNodeCoords(to); if(!a||!b) return null;
+  const km=Math.round(hav(a.lat,a.lon,b.lat,b.lon)*1.12);
+  const hours=km/4.5; const days=Math.ceil(hours/8);
+  return{km,hours,price:Math.round(km*0.02),co2:0,days};
+}
+// Resolve a city name to its NODES key (for edge lookups).
+// If the name is already in NODES, use it directly.
+// If it's a dynamicNode or customNode, find the nearest NODES city by coords.
+function resolveToNode(name){
+  if(NODES[name]) return name;
+  const coords=getNodeCoords(name);
+  if(!coords) return null;
+  let best=null,bd=Infinity;
+  for(const c in NODES){
+    const n=NODES[c];
+    const d=hav(coords.lat,coords.lon,n.lat,n.lon);
+    if(d<bd){bd=d;best=c;}
+  }
+  // Only resolve if the nearest NODES city is within 40km
+  return bd<=40?best:null;
+}
+
+function getAllModes(from,to){
+  const out={};
+  const rFrom=resolveToNode(from);
+  const rTo=resolveToNode(to);
+  if(rFrom&&rTo){
+    ['train','flight','ferry'].forEach(m=>{const e=getEdge(rFrom,rTo,m);if(e)out[m]=e;});
+  }
+  const car=getCarData(from,to); if(car) out.car=car;
+  const walk=getWalkingData(from,to); if(walk) out.walking=walk;
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════
+// UNIVERSITIES
+// ═══════════════════════════════════════════════════════════
+const INSA=[
+  {name:'INSA Lyon',city:'Lyon'},{name:'INSA Toulouse',city:'Toulouse'},
+  {name:'INSA Rennes',city:'Rennes'},{name:'INSA Rouen Normandie',city:'Rouen'},
+  {name:'INSA Strasbourg',city:'Strasbourg'},{name:'INSA Centre Val de Loire',city:'Blois'},
+  {name:'INSA Hauts-de-France',city:'Valenciennes'},
+];
+const ECIU=[
+  {name:'Aalborg University',city:'Aalborg',country:'Denmark'},
+  {name:'Dublin City University',city:'Dublin',country:'Ireland'},
+  {name:'Hamburg Univ. of Technology',city:'Hamburg',country:'Germany'},
+  {name:'Kaunas Univ. of Technology',city:'Kaunas',country:'Lithuania'},
+  {name:'Linköping University',city:'Linköping',country:'Sweden'},
+  {name:'Tampere University',city:'Tampere',country:'Finland'},
+  {name:'Univ. Autònoma de Barcelona',city:'Barcelona',country:'Spain'},
+  {name:'University of Aveiro',city:'Aveiro',country:'Portugal'},
+  {name:'University of Stavanger',city:'Stavanger',country:'Norway'},
+  {name:'University of Trento',city:'Trento',country:'Italy'},
+  {name:'University of Twente',city:'Enschede',country:'Netherlands'},
+  {name:'Łódź Univ. of Technology',city:'Lodz',country:'Poland'},
+];
+
+// ─── Thinking prompts per route type ────────────────────────
+const PROMPTS={
+  eco:{
+    title:'🌿 Eco Route — think green',
+    q1:'Which cities can you connect by train without flying?',
+    q2:'Could a ferry or night train replace a flight on this journey?',
+  },
+  free:{
+    title:'✦ Free Choice — think creatively',
+    q1:'What would make this route memorable or unique?',
+    q2:'Are you prioritising speed, cost, or experience?',
+  }
+};
+
+const ROUTE_COLORS={eco:'#6ECB8A',free:'#D4B86A'};
+const ROUTE_DASHES={eco:'4,4',free:'none'};
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let studentName='', studentUni='', studentCity='';
+let destinationCity=null;
+let currentRoute='eco';  // 'eco' | 'free'
+// Two independent leg arrays
+let routeLegs={eco:[],free:[]};
+let pendingCity=null,pendingFrom=null;
+let customNodes={},dynamicNodes={},freeWpCount=0;
+let snapMode='snap',geocoding=false;
+let zoomTransform=d3.zoomIdentity;
+let projection,svg,gMap,gHubs,gRoutes,gSnap,gMarkers,zoomBehavior;
+const geocodeCache={},geocodeInProgress={};
+
+// ═══════════════════════════════════════════════════════════
+// ONBOARDING
+// ═══════════════════════════════════════════════════════════
+(()=>{
+  const sel=document.getElementById('ob-uni');
+  ECIU.forEach(u=>{
+    const o=document.createElement('option');
+    o.value=JSON.stringify({name:u.name,city:u.city,country:u.country});
+    o.textContent=u.name+' ('+u.country+')';
+    sel.appendChild(o);
+  });
+  const check=()=>{
+    const n=document.getElementById('ob-name').value.trim();
+    const u=document.getElementById('ob-uni').value;
+    document.getElementById('ob-btn').disabled=!(n&&u);
+  };
+  document.getElementById('ob-name').addEventListener('input',check);
+  document.getElementById('ob-uni').addEventListener('change',check);
+})();
+
+function startChallenge(){
+  const nameVal=document.getElementById('ob-name').value.trim();
+  const uniVal=document.getElementById('ob-uni').value;
+  if(!nameVal||!uniVal) return;
+  const uni=JSON.parse(uniVal);
+  studentName=nameVal; studentUni=uni.name; studentCity=uni.city;
+  document.getElementById('badge-name').textContent=nameVal;
+  document.getElementById('badge-uni').textContent=uni.name;
+  document.getElementById('student-badge').style.display='flex';
+  document.getElementById('onboarding').style.opacity='0';
+  document.getElementById('onboarding').style.transition='opacity .4s';
+  setTimeout(()=>document.getElementById('onboarding').style.display='none',400);
+  // Populate INSA selector
+  const si=document.getElementById('sel-insa');
+  INSA.forEach(u=>{
+    const o=document.createElement('option');o.value=u.city;o.textContent=u.name;si.appendChild(o);
+  });
+  // Zoom to student city
+  if(NODES[studentCity]) zoomToCity(studentCity);
+  updatePrompts();updateHint();updateWpList();updatePanel();
+}
+
+// ═══════════════════════════════════════════════════════════
+// ROUTE TABS
+// ═══════════════════════════════════════════════════════════
+function switchRoute(type){
+  currentRoute=type;
+  document.getElementById('tab-eco').classList.toggle('active',type==='eco');
+  document.getElementById('tab-free').classList.toggle('active',type==='free');
+  updatePrompts();updateHint();updateWpList();updatePanel();redrawRoute();
+}
+
+function updatePrompts(){
+  const p=PROMPTS[currentRoute];
+  document.getElementById('prompt-title').textContent=p.title;
+  document.getElementById('prompt-q1').textContent=p.q1;
+  document.getElementById('prompt-q2').textContent=p.q2;
+}
+
+// ═══════════════════════════════════════════════════════════
+// INSA / MISSION
+// ═══════════════════════════════════════════════════════════
+function onInsaChange(){
+  destinationCity=document.getElementById('sel-insa').value||null;
+  updateMissionStatus();updateHint();
+}
+function updateMissionStatus(){
+  const st=document.getElementById('mission-status');
+  if(studentCity&&destinationCity){
+    const legs=routeLegs[currentRoute];
+    const done=legs.length>0&&legs[legs.length-1].to===destinationCity;
+    if(done) showCompleteBanner();
+    st.textContent=(done?'✅ ':'🗺 ')+studentCity+' → '+destinationCity;
+    st.style.color=done?'rgba(110,203,138,.9)':'var(--text-dim)';
+  } else {
+    st.textContent='Choose your INSA destination above';
+    st.style.color='var(--text-faint)';
+  }
+}
+function showCompleteBanner(){
+  const b=document.getElementById('complete-banner');
+  b.classList.add('visible');
+  setTimeout(()=>b.classList.remove('visible'),3500);
+}
+function zoomToCity(city){
+  if(!projection||!NODES[city]) return;
+  const [x,y]=projection([NODES[city].lon,NODES[city].lat]);
+  const w=document.getElementById('map-wrap').clientWidth;
+  const h=document.getElementById('map-wrap').clientHeight;
+  svg.transition().duration(650).call(zoomBehavior.transform,
+    d3.zoomIdentity.translate(w/2-3*x,h/2-3*y).scale(3));
+}
+
+// ═══════════════════════════════════════════════════════════
+// SNAP MODE
+// ═══════════════════════════════════════════════════════════
+function setSnapMode(mode){
+  snapMode=mode;
+  document.querySelectorAll('.snap-opt').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+  svg.style('cursor',mode==='free'?'cell':'crosshair');
+}
+
+// ═══════════════════════════════════════════════════════════
+// REVERSE GEOCODING
+// ═══════════════════════════════════════════════════════════
+async function reverseGeocode(lat,lon){
+  const key=`${lat.toFixed(3)},${lon.toFixed(3)}`;
+  if(geocodeCache[key]) return geocodeCache[key];
+  if(geocodeInProgress[key]) return geocodeInProgress[key];
+  const p=(async()=>{
+    const r=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=12&accept-language=en`,
+      {headers:{'User-Agent':'ECIU-StudentPlanner/1.0'}});
+    if(!r.ok) throw new Error('Nominatim '+r.status);
+    const d=await r.json(); if(d.error) throw new Error(d.error);
+    const a=d.address||{};
+    const name=a.city||a.town||a.village||a.hamlet||a.suburb||
+      (d.display_name?d.display_name.split(',')[0].trim():null)||
+      `${lat.toFixed(2)}°N,${Math.abs(lon).toFixed(2)}°${lon>=0?'E':'W'}`;
+    const result={name,lat:parseFloat(d.lat),lon:parseFloat(d.lon)};
+    geocodeCache[key]=result; return result;
+  })();
+  geocodeInProgress[key]=p; p.finally(()=>delete geocodeInProgress[key]);
+  return p;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════════════════════
+function initMap(){
+  const wrap=document.getElementById('map-wrap');
+  const w=wrap.clientWidth,h=wrap.clientHeight;
+  svg=d3.select('#map-svg').attr('width',w).attr('height',h);
+  const defs=svg.append('defs');
+  const bg=defs.append('radialGradient').attr('id','bgG').attr('cx','50%').attr('cy','40%').attr('r','70%');
+  bg.append('stop').attr('offset','0%').attr('stop-color','#1A3050');
+  bg.append('stop').attr('offset','100%').attr('stop-color','#0D1F35');
+  const gf=defs.append('filter').attr('id','glow').attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+  gf.append('feGaussianBlur').attr('stdDeviation','3').attr('result','b');
+  const gm=gf.append('feMerge'); gm.append('feMergeNode').attr('in','b'); gm.append('feMergeNode').attr('in','SourceGraphic');
+  svg.append('rect').attr('width',w).attr('height',h).attr('fill','url(#bgG)');
+  projection=d3.geoMercator().center([13,54]).scale(w*.88).translate([w/2,h/2]);
+  const path=d3.geoPath().projection(projection);
+  gMap=svg.append('g'); gHubs=svg.append('g'); gRoutes=svg.append('g');
+  gSnap=svg.append('g'); gMarkers=svg.append('g');
+  gMap.append('path').datum(d3.geoGraticule().step([10,10])())
+    .attr('fill','none').attr('stroke','rgba(255,255,255,.022)').attr('stroke-width',.6).attr('d',path);
+  fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+    .then(r=>r.json()).then(world=>{
+      gMap.append('g').selectAll('path')
+        .data(topojson.feature(world,world.objects.countries).features).join('path')
+        .attr('fill','#D8D0B8').attr('stroke','#B8AC90').attr('stroke-width',.35).attr('d',path);
+      gMap.append('path').datum(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b))
+        .attr('fill','none').attr('stroke','#A89878').attr('stroke-width',.5).attr('d',path);
+      drawHubs(); drawMarkers();
+    }).catch(()=>{drawHubs();drawMarkers();});
+  zoomBehavior=d3.zoom().scaleExtent([.35,16]).on('zoom',e=>{
+    zoomTransform=e.transform;
+    [gMap,gHubs,gRoutes,gSnap,gMarkers].forEach(g=>g.attr('transform',e.transform));
+  });
+  svg.call(zoomBehavior);
+  svg.on('click',onMapClick);
+  svg.on('mousemove',onMapHover);
+  svg.on('mouseleave',()=>{gSnap.selectAll('.prev').remove();document.getElementById('hover-label').style.display='none';});
+}
+function zi(){svg.transition().duration(280).call(zoomBehavior.scaleBy,1.5);}
+function zo(){svg.transition().duration(280).call(zoomBehavior.scaleBy,.67);}
+function zr(){svg.transition().duration(450).call(zoomBehavior.transform,d3.zoomIdentity);}
+
+function onMapHover(ev){
+  if(pendingCity||geocoding) return;
+  const [mx,my]=d3.pointer(ev);
+  gSnap.selectAll('.prev').remove();
+  const label=document.getElementById('hover-label');
+  const [lon,lat]=projection.invert(zoomTransform.invert([mx,my]));
+  if(snapMode==='snap'){
+    const nearest=nearestKnownNode(lon,lat);
+    if(nearest&&nearest.dist<=25){
+      const [nx,ny]=projection([nearest.node.lon,nearest.node.lat]);
+      const g=gSnap.append('g').attr('class','prev').attr('transform',`translate(${nx},${ny})`);
+      g.append('circle').attr('r',14).attr('fill','none')
+        .attr('stroke','rgba(212,184,106,.55)').attr('stroke-width',1.5)
+        .attr('stroke-dasharray','4,3').attr('pointer-events','none');
+      g.append('circle').attr('r',3.5).attr('fill','rgba(212,184,106,.45)').attr('pointer-events','none');
+      label.textContent=nearest.name;
+      const rect=document.getElementById('map-wrap').getBoundingClientRect();
+      label.style.left=(ev.clientX-rect.left)+'px'; label.style.top=(ev.clientY-rect.top)+'px';
+      label.style.display='block';
+    } else { label.style.display='none'; }
+  } else {
+    const [plx,ply]=projection.invert(zoomTransform.invert([mx,my]));
+    const [pcx,pcy]=projection([plx,ply]);
+    const g=gSnap.append('g').attr('class','prev').attr('transform',`translate(${pcx},${pcy})`);
+    g.append('line').attr('x1',-8).attr('x2',8).attr('y1',0).attr('y2',0)
+      .attr('stroke','rgba(212,184,106,.55)').attr('stroke-width',1.5).attr('pointer-events','none');
+    g.append('line').attr('x1',0).attr('x2',0).attr('y1',-8).attr('y2',8)
+      .attr('stroke','rgba(212,184,106,.55)').attr('stroke-width',1.5).attr('pointer-events','none');
+    label.style.display='none';
+  }
+}
+
+async function onMapClick(ev){
+  if(pendingCity||geocoding) return;
+  if(ev.target.closest('.uni-marker')) return;
+  const [mx,my]=d3.pointer(ev);
+  const [lon,lat]=projection.invert(zoomTransform.invert([mx,my]));
+  if(snapMode==='free'){placeFreeWaypoint(lon,lat);return;}
+  const nearest=nearestKnownNode(lon,lat);
+  if(nearest&&nearest.dist<=20){placeStop(nearest.name);return;}
+  geocoding=true; document.getElementById('geo-loading').classList.add('active');
+  gSnap.selectAll('.prev').remove(); document.getElementById('hover-label').style.display='none';
+  try{
+    const place=await reverseGeocode(lat,lon);
+    if(!dynamicNodes[place.name]) dynamicNodes[place.name]={lat:place.lat,lon:place.lon};
+    placeStop(place.name);
+  }catch{placeFreeWaypoint(lon,lat); toast('Geocoding unavailable — placed a free pin.');}
+  finally{geocoding=false; document.getElementById('geo-loading').classList.remove('active');}
+}
+
+function nearestKnownNode(lon,lat){
+  let best=null,bd=Infinity,bn=null;
+  for(const n of [NODES,dynamicNodes])
+    for(const name in n){const nd=n[name];const d=hav(lat,lon,nd.lat,nd.lon);if(d<bd){bd=d;best=name;bn=nd;}}
+  return best?{name:best,node:bn,dist:bd}:null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// PLACE STOPS
+// ═══════════════════════════════════════════════════════════
+function getAllWaypoints(){
+  const legs=routeLegs[currentRoute];
+  if(!legs.length) return studentCity?[studentCity]:[];
+  return[legs[0].from,...legs.map(l=>l.to)];
+}
+
+function placeStop(city){
+  if(!studentCity){toast('Something went wrong — no origin city set.');return;}
+  const wps=getAllWaypoints();
+  const prev=wps[wps.length-1];
+  if(!prev){pendingFrom=studentCity;pendingCity=city;showModePicker(studentCity,city);return;}
+  if(prev===city){toast(city+' is already your last stop.');return;}
+  pendingFrom=prev; pendingCity=city; showModePicker(prev,city);
+}
+
+function placeFreeWaypoint(lon,lat){
+  freeWpCount++;
+  const key='📌 Stop '+freeWpCount;
+  customNodes[key]={lat,lon};
+  const wps=getAllWaypoints();
+  const prev=wps[wps.length-1]||(studentCity);
+  pendingFrom=prev; pendingCity=key; showModePicker(prev,key);
+  redrawCustomPins();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODE PICKER — manual choice, no auto-suggestion
+// ═══════════════════════════════════════════════════════════
+const MODE_ICON={train:'🚂',flight:'✈️',ferry:'🚢',car:'🚗',walking:'🚶'};
+const MODE_NAME={train:'Train',flight:'Flight',ferry:'Ferry',car:'By Car',walking:'On Foot'};
+const MODE_SUB={
+  train:'Scheduled rail service',
+  flight:'Low-cost advance booking',
+  ferry:'Scheduled crossing',
+  car:'Drive yourself',
+  walking:'The legendary pilgrimage 🦶'
+};
+
+// Thinking nudges shown inside the mode picker depending on route type
+const PICKER_NUDGES={
+  eco:{
+    train:'✅ Great eco choice!',
+    flight:'⚠ Flights have high CO₂ — is there a train alternative via a hub city?',
+    ferry:'🌿 Ferries are often greener than flying.',
+    car:'🚗 Car emits ~5× more CO₂ than train over long distances.',
+    walking:'🌱 Zero emissions. Respect.',
+  },
+  free:{
+    train:'🚂 Reliable and scenic.',
+    flight:'✈️ Fast but carbon-intensive.',
+    ferry:'⛴ Great for crossing seas.',
+    car:'🚗 Full flexibility.',
+    walking:'🦶 The ultimate adventure.',
+  }
+};
+
+function showModePicker(from,to){
+  const picker=document.getElementById('mode-picker');
+  const fd=from.replace('📌 ',''),td=to.replace('📌 ','');
+  document.getElementById('mp-from-to').innerHTML=
+    `${fd} <span class="mp-route-arrow">→</span> ${td}`;
+
+  // Thinking prompt
+  const nudge=document.getElementById('mp-think-box');
+  const p=PROMPTS[currentRoute];
+  nudge.innerHTML=`<b>Think:</b> ${currentRoute==='eco'?p.q1:p.q2}`;
+
+  const modes=getAllModes(from,to);
+  const body=document.getElementById('mp-options');
+  body.innerHTML='';
+  const pub=['train','flight','ferry'].filter(m=>modes[m]);
+  const priv=['car','walking'].filter(m=>modes[m]);
+  const allVals=Object.values(modes);
+  const minCo2=allVals.length?Math.min(...allVals.map(d=>d.co2)):0;
+  const minPrice=allVals.length?Math.min(...allVals.map(d=>d.price)):0;
+  const minHours=allVals.length?Math.min(...allVals.map(d=>d.hours)):0;
+  if(pub.length===0){
+    const w=document.createElement('div'); w.className='mp-no-service';
+    w.innerHTML='No direct train, flight or ferry between these two places. Try clicking an intermediate hub city on the map first.'; body.appendChild(w);
+  } else {
+    const l=document.createElement('div'); l.className='mp-section';
+    l.textContent='Scheduled Services'; body.appendChild(l);
+    pub.forEach(m=>body.appendChild(buildOpt(m,modes[m],minCo2,minPrice,minHours)));
+  }
+
+  if(priv.length){
+    const l2=document.createElement('div'); l2.className='mp-section';
+    l2.textContent='Self Transport'; body.appendChild(l2);
+    priv.forEach(m=>body.appendChild(buildOpt(m,modes[m],minCo2,minPrice,minHours)));
+  }
+
+  // Show picker first (off-screen) so scrollHeight is measurable
+  picker.style.left='-9999px'; picker.style.top='0';
+  picker.style.display='block'; picker.className='mp-visible';
+
+  const mapEl=document.getElementById('map-wrap');
+  const mw=mapEl.clientWidth, mh=mapEl.clientHeight;
+  const PW=330;
+  const PH=Math.min(picker.scrollHeight, mh-24);
+  picker.style.maxHeight=PH+'px';
+
+  const n=getNodeCoords(to);
+  let px=mw/2-PW/2, py=mh/2-PH/2; // default: centre of map
+  if(n){
+    const [sx,sy]=zoomTransform.apply(projection([n.lon,n.lat]));
+    // Prefer right of point; fall back to left
+    const tryRight=sx+28+PW;
+    px = tryRight<=mw-8 ? sx+28 : sx-PW-18;
+    // Clamp into map vertically, centred on point
+    py = Math.max(8, Math.min(sy-PH/2, mh-PH-8));
+    // If horizontally still off, centre on screen
+    if(px<8 || px+PW>mw-8) px=Math.max(8, Math.min(mw/2-PW/2, mw-PW-8));
+  }
+  picker.style.left=px+'px'; picker.style.top=py+'px';
+  pulseSnap(to);
+}
+
+function buildOpt(m,d,minCo2,minPrice,minHours){
+  const div=document.createElement('div'); div.className=`mp-opt mp-${m}`;
+  const pC=d.price===minPrice?'g':d.price<minPrice*2?'m':'r';
+  const tC=d.hours===minHours?'g':d.hours<minHours*2?'m':'r';
+  const cC=d.co2===0?'g':d.co2===minCo2?'g':d.co2<minCo2*2.5?'m':'r';
+  let timeStr,priceStr,co2Str,subStr=MODE_SUB[m];
+  if(m==='walking'){
+    const days=d.days||Math.ceil(d.hours/8);
+    timeStr=days===1?`${Math.round(d.hours)}h`:`~${days} days`;
+    priceStr='Free*'; co2Str='0 kg CO₂'; subStr='*Bring good shoes';
+  } else { timeStr=fHr(d.hours); priceStr='~€'+d.price; co2Str=d.co2+' kg CO₂'; }
+  // Eco nudge
+  const nudge=PICKER_NUDGES[currentRoute][m]||'';
+  div.innerHTML=`
+    <div class="mp-icon">${MODE_ICON[m]}</div>
+    <div class="mp-body">
+      <div class="mp-name">${MODE_NAME[m]}</div>
+      <div class="mp-sub">${nudge}</div>
+      <div class="mp-stats">
+        <span class="mp-stat">⏱ <b class="${tC}">${timeStr}</b></span>
+        <span class="mp-stat">💶 <b class="${pC}">${priceStr}</b></span>
+        <span class="mp-stat">🌿 <b class="${cC}">${co2Str}</b></span>
+      </div>
+    </div>`;
+  div.onclick=()=>{
+    if(m==='walking'){
+      const days=d.days||Math.ceil(d.hours/8);
+      if(!confirm(`Walk ${(pendingFrom||'').replace('📌 ','')} → ${(pendingCity||'').replace('📌 ','')}?\n~${days} day${days>1?'s':''} on foot. You legend. 🦶`)) return;
+    }
+    confirmMode(m,d);
+  };
+  return div;
+}
+
+function confirmMode(mode,data){
+  document.getElementById('mode-picker').style.display='none';
+  routeLegs[currentRoute].push({from:pendingFrom,to:pendingCity,mode,data});
+  toast(`${(pendingFrom||'').replace('📌 ','')} → ${(pendingCity||'').replace('📌 ','')} · ${MODE_NAME[mode]}`);
+  pendingCity=null; pendingFrom=null;
+  redrawRoute(); updateWpList(); updatePanel();
+  gSnap.selectAll('.snap-anim').remove();
+  // Check if destination reached
+  const legs=routeLegs[currentRoute];
+  if(destinationCity&&legs.length&&legs[legs.length-1].to===destinationCity){
+    showCompleteBanner(); updateMissionStatus();
+  }
+}
+
+function cancelPending(){
+  document.getElementById('mode-picker').style.display='none';
+  if(pendingCity&&customNodes[pendingCity]) delete customNodes[pendingCity];
+  if(pendingCity&&dynamicNodes[pendingCity]&&
+    !Object.values(routeLegs).flat().some(l=>l.from===pendingCity||l.to===pendingCity))
+    delete dynamicNodes[pendingCity];
+  pendingCity=null; pendingFrom=null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// MARKERS
+// ═══════════════════════════════════════════════════════════
+// ─── Hub city tiers ─────────────────────────────────────
+// Major hubs: visible label + slightly larger dot
+// Minor hubs: dot only (existing behaviour)
+const HUB_MAJOR=new Set([
+  'Paris','London','Brussels','Amsterdam','Frankfurt','Munich',
+  'Berlin','Copenhagen','Stockholm','Oslo','Vienna','Madrid',
+  'Barcelona','Lisbon','Warsaw','Milan','Rome','Prague',
+  'Budapest','Zurich','Lyon','Toulouse','Marseille','Bordeaux',
+  'Helsinki','Gothenburg','Hamburg','Cologne','Genoa','San Sebastian',
+  'Metz','Luxembourg','Dortmund','Aarhus','Manchester','Edinburgh',
+  'Utrecht','Rotterdam','Ghent','Naples','Ljubljana','Zagreb','Trondheim',
+  'Ljubljana','Zagreb','Naples','Chambery',
+]);
+
+function drawHubs(){
+  const tip=document.getElementById('tip');
+  for(const city in NODES){
+    const isUni=[...ECIU,...INSA].some(u=>u.city===city);
+    if(isUni) continue;
+    const [x,y]=projection([NODES[city].lon,NODES[city].lat]);
+    if(HUB_MAJOR.has(city)){
+      // Larger dot + label
+      gHubs.append('circle').attr('cx',x).attr('cy',y).attr('r',3)
+        .attr('fill','rgba(255,255,255,.28)').attr('stroke','rgba(255,255,255,.12)')
+        .attr('stroke-width',0.8).attr('pointer-events','all')
+        .style('cursor','pointer')
+        .on('mousemove',ev=>showTipAt(ev,city,'Hub city · click to add as stop'))
+        .on('mouseleave',()=>tip.style.opacity='0')
+        .on('click',ev=>{ev.stopPropagation();if(!pendingCity&&!geocoding)placeStop(city);});
+      gHubs.append('text')
+        .attr('x',x).attr('y',y-7).attr('text-anchor','middle')
+        .attr('font-family','Outfit,sans-serif').attr('font-size',8.5).attr('font-weight','400')
+        .attr('fill','rgba(242,237,228,.55)')
+        .attr('paint-order','stroke fill').attr('stroke','#0D1F35').attr('stroke-width',2.5)
+        .text(city).attr('pointer-events','none');
+    } else {
+      // Small background dot only
+      gHubs.append('circle').attr('cx',x).attr('cy',y).attr('r',1.8)
+        .attr('fill','rgba(255,255,255,.10)').attr('pointer-events','none');
+    }
+  }
+}
+
+function showTipAt(ev,title,sub){
+  const t=document.getElementById('tip');
+  const rect=document.getElementById('map-wrap').getBoundingClientRect();
+  t.innerHTML=`<strong>${title}</strong><div class="tip-sub">${sub}</div>`;
+  t.style.left=(ev.clientX-rect.left+16)+'px';
+  t.style.top=(ev.clientY-rect.top-12)+'px';
+  t.style.opacity='1';
+}
+function drawMarkers(){
+  const tip=document.getElementById('tip');
+  ECIU.forEach(u=>{
+    const n=NODES[u.city]; if(!n) return;
+    const [x,y]=projection([n.lon,n.lat]);
+    const isOrigin=u.city===studentCity;
+    const g=gMarkers.append('g').attr('class','uni-marker').attr('transform',`translate(${x},${y})`);
+    g.append('circle').attr('r',isOrigin?11:8).attr('fill','none')
+      .attr('stroke',isOrigin?'rgba(212,184,106,.9)':'rgba(212,184,106,.5)').attr('stroke-width',isOrigin?1.5:1)
+      .attr('pointer-events','none');
+    g.append('circle').attr('r',isOrigin?4.5:3.5)
+      .attr('fill',isOrigin?'#D4B86A':'rgba(212,184,106,.7)')
+      .attr('stroke','rgba(13,31,53,.9)').attr('stroke-width',1)
+      .style('cursor','pointer')
+      .on('mousemove',ev=>{
+        const rect=document.getElementById('map-wrap').getBoundingClientRect();
+        tip.innerHTML=`<strong>${u.name}</strong><div class="tip-sub">${u.city}, ${u.country}${isOrigin?' · Your university':''}</div>`;
+        tip.style.left=(ev.clientX-rect.left+16)+'px'; tip.style.top=(ev.clientY-rect.top-12)+'px';
+        tip.style.opacity='1';
+      })
+      .on('mouseleave',()=>tip.style.opacity='0')
+      .on('click',ev=>{ev.stopPropagation();if(!pendingCity&&!geocoding)placeStop(u.city);});
+    g.append('text').attr('dy',isOrigin?20:16).attr('text-anchor','middle')
+      .attr('font-family','Outfit,sans-serif').attr('font-size',isOrigin?10:9).attr('font-weight',isOrigin?'500':'400')
+      .attr('fill',isOrigin?'rgba(242,237,228,.95)':'rgba(242,237,228,.78)')
+      .attr('paint-order','stroke fill').attr('stroke','#0D1F35').attr('stroke-width',2.5)
+      .text(u.city).style('pointer-events','none');
+  });
+  INSA.forEach(u=>{
+    const n=NODES[u.city]; if(!n) return;
+    const [x,y]=projection([n.lon,n.lat]);
+    const isDest=u.city===destinationCity;
+    const g=gMarkers.append('g').attr('class','uni-marker').attr('transform',`translate(${x},${y})`);
+    g.append('polygon').attr('points','0,-9 6,0 0,9 -6,0')
+      .attr('fill',isDest?'rgba(196,88,46,.25)':'rgba(196,88,46,.1)')
+      .attr('stroke',isDest?'#E06040':'#C4582E').attr('stroke-width',isDest?1.5:1.1)
+      .style('cursor','pointer')
+      .on('mousemove',ev=>{
+        const rect=document.getElementById('map-wrap').getBoundingClientRect();
+        tip.innerHTML=`<strong>${u.name}</strong><div class="tip-sub">${u.city} · INSA Campus${isDest?' · Your destination':''}</div>`;
+        tip.style.left=(ev.clientX-rect.left+16)+'px'; tip.style.top=(ev.clientY-rect.top-12)+'px';
+        tip.style.opacity='1';
+      })
+      .on('mouseleave',()=>tip.style.opacity='0')
+      .on('click',ev=>{ev.stopPropagation();if(!pendingCity&&!geocoding)placeStop(u.city);});
+    g.append('circle').attr('r',2).attr('fill','#D0603A').attr('pointer-events','none');
+    g.append('text').attr('dy',isDest?21:19).attr('text-anchor','middle')
+      .attr('font-family','Outfit,sans-serif').attr('font-size',9).attr('font-weight','500')
+      .attr('fill',isDest?'rgba(240,160,80,.95)':'rgba(240,160,80,.7)')
+      .attr('paint-order','stroke fill').attr('stroke','#0D1F35').attr('stroke-width',2.5)
+      .text(u.city).style('pointer-events','none');
+  });
+}
+
+function pulseSnap(city){
+  const n=getNodeCoords(city); if(!n) return;
+  const [x,y]=projection([n.lon,n.lat]);
+  const r=gSnap.append('circle').attr('cx',x).attr('cy',y).attr('r',5)
+    .attr('fill','none').attr('stroke','rgba(212,184,106,.9)').attr('stroke-width',1.5)
+    .attr('class','snap-anim');
+  setTimeout(()=>r.remove(),900);
+}
+
+// ═══════════════════════════════════════════════════════════
+// DRAWING
+// ═══════════════════════════════════════════════════════════
+const MODE_COLOR={train:'#6ECB8A',flight:'#F0A050',ferry:'#5BBDE0',car:'#96AEBF',walking:'#8DC0A0'};
+const MODE_DASH={train:'none',flight:'6,5',ferry:'none',car:'8,3',walking:'3,5'};
+
+function redrawRoute(){
+  gRoutes.selectAll('*').remove();
+  // Draw both routes, dim the inactive one
+  ['eco','free'].forEach(type=>{
+    const legs=routeLegs[type]; if(!legs.length) return;
+    const isActive=type===currentRoute;
+    const opacity=isActive?1.0:0.28;
+    const routeColor=ROUTE_COLORS[type];
+    legs.forEach(leg=>{
+      const a=getNodeCoords(leg.from),b=getNodeCoords(leg.to);
+      if(!a||!b) return;
+      const c=MODE_COLOR[leg.mode]||routeColor;
+      const dash=MODE_DASH[leg.mode]||'none';
+      const [x1,y1]=projection([a.lon,a.lat]);
+      const [x2,y2]=projection([b.lon,b.lat]);
+      let pd;
+      if(leg.mode==='flight'){
+        const mx=(x1+x2)/2,my=(y1+y2)/2,dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
+        const nx=-dy/(len||1),ny=dx/(len||1),bulge=Math.min(len*.2,100);
+        pd=`M${x1},${y1} Q${mx+nx*bulge},${my+ny*bulge} ${x2},${y2}`;
+      } else { pd=`M${x1},${y1} L${x2},${y2}`; }
+      gRoutes.append('path').attr('fill','none').attr('stroke','rgba(0,0,0,.25)')
+        .attr('stroke-width',5).attr('stroke-linecap','round').attr('d',pd).attr('opacity',opacity*.75);
+      const pe=gRoutes.append('path').attr('fill','none').attr('stroke',c)
+        .attr('stroke-width',2.8).attr('stroke-linecap','round').attr('d',pd).attr('opacity',opacity);
+      if(dash&&dash!=='none') pe.attr('stroke-dasharray',dash).attr('class','route-animated');
+    });
+    // Dots at named waypoints
+    const wps=legs.length?[legs[0].from,...legs.map(l=>l.to)]:[];
+    wps.forEach((city,i)=>{
+      const n=getNodeCoords(city); if(!n) return;
+      const [x,y]=projection([n.lon,n.lat]);
+      const isFirst=i===0,isLast=i===wps.length-1;
+      const dotColor=isFirst?'#F2EDE4':isLast?routeColor:'rgba(242,237,228,.7)';
+      const g=gRoutes.append('g').attr('transform',`translate(${x},${y})`).attr('opacity',opacity);
+      if(isFirst||isLast) g.append('circle').attr('r',10).attr('fill','none')
+        .attr('stroke',dotColor).attr('stroke-width',.8).attr('opacity',.42);
+      g.append('circle').attr('r',5).attr('fill',dotColor).attr('stroke','#0D1F35').attr('stroke-width',1.5);
+      g.append('text').attr('dy','-9').attr('text-anchor','middle')
+        .attr('font-family','Outfit,sans-serif').attr('font-size',8.5).attr('fill','#F2EDE4')
+        .attr('paint-order','stroke fill').attr('stroke','#0D1F35').attr('stroke-width',2.5)
+        .text(city.replace('📌 ','')).style('pointer-events','none');
+    });
+  });
+  redrawCustomPins();
+}
+
+function redrawCustomPins(){
+  gSnap.selectAll('.custom-pin').remove();
+  Object.entries(customNodes).forEach(([key,n])=>{
+    const [x,y]=projection([n.lon,n.lat]);
+    const g=gSnap.append('g').attr('class','custom-pin')
+      .attr('transform',`translate(${x},${y})`).attr('pointer-events','none');
+    g.append('circle').attr('r',5).attr('fill','#C4582E').attr('stroke','#F2EDE4').attr('stroke-width',1.5);
+    g.append('line').attr('x1',0).attr('y1',5).attr('x2',0).attr('y2',12)
+      .attr('stroke','#C4582E').attr('stroke-width',2);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// WAYPOINT LIST
+// ═══════════════════════════════════════════════════════════
+function updateWpList(){
+  const list=document.getElementById('wp-list');
+  const wps=getAllWaypoints(); list.innerHTML='';
+  wps.forEach((city,i)=>{
+    const li=document.createElement('li'); li.className='wp-item';
+    const num=document.createElement('div');
+    num.className='wp-num'+(i===0?' start':i===wps.length-1?' end':'');
+    num.textContent=i+1; li.appendChild(num);
+    const cityEl=document.createElement('div');
+    cityEl.className='wp-city'; cityEl.textContent=city.replace('📌 ',''); li.appendChild(cityEl);
+    const legs=routeLegs[currentRoute];
+    if(i>0&&legs[i-1]){
+      const badge=document.createElement('span');
+      badge.className='wp-badge wb-'+legs[i-1].mode;
+      badge.textContent=MODE_ICON[legs[i-1].mode]||legs[i-1].mode;
+      li.appendChild(badge);
+      const del=document.createElement('span'); del.className='wp-del'; del.textContent='×';
+      del.onclick=()=>{
+        legs.splice(i-1,1);
+        if(customNodes[city]) delete customNodes[city];
+        redrawRoute(); updateWpList(); updatePanel();
+      };
+      li.appendChild(del);
+    }
+    list.appendChild(li);
+  });
+  // Ghost destination hint
+  if(destinationCity&&wps.length>0&&wps[wps.length-1]!==destinationCity){
+    const hint=document.createElement('li'); hint.className='wp-item';
+    hint.style.cssText='opacity:.32;font-style:italic;';
+    const n=document.createElement('div'); n.className='wp-num'; n.textContent='…';
+    const c=document.createElement('div'); c.className='wp-city';
+    c.textContent='→ '+destinationCity+' (goal)'; hint.appendChild(n); hint.appendChild(c);
+    list.appendChild(hint);
+  }
+  updateHint();
+}
+
+function updateHint(){
+  const hint=document.getElementById('step-hint');
+  const wps=getAllWaypoints();
+  const typeName=currentRoute==='eco'?'🌿 Eco Route':'✦ Free Choice';
+  if(!destinationCity){
+    hint.innerHTML=`<strong>${typeName}</strong><br>Choose your INSA destination first, then click cities on the map to plan your journey step by step.`;
+  } else if(!wps.length||wps.length===1){
+    hint.innerHTML=`<strong>${typeName}</strong><br>Click a city on the map to add your first stop from <strong>${studentCity||'your university'}</strong>.`;
+  } else if(wps[wps.length-1]===destinationCity){
+    hint.innerHTML=`✅ <strong>${typeName} complete!</strong><br>Click <em>Save Route</em> when you're happy with it.`;
+  } else {
+    hint.innerHTML=`<strong>${typeName}</strong><br>Keep adding stops towards <strong>${destinationCity}</strong>. Each click shows your transport options.`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// RIGHT PANEL
+// ═══════════════════════════════════════════════════════════
+function fH(h){
+  const hr=Math.floor(h),mn=Math.round((h-hr)*60);
+  if(hr===0) return `${mn}<span class="stat-unit">min</span>`;
+  if(mn===0) return `${hr}<span class="stat-unit">h</span>`;
+  return `${hr}<span class="stat-unit">h</span>${mn}<span class="stat-unit">m</span>`;
+}
+function fHr(h){
+  const hr=Math.floor(h),mn=Math.round((h-hr)*60);
+  if(hr===0) return `${mn}min`; if(mn===0) return `${hr}h`; return `${hr}h${mn}m`;
+}
+
+function updatePanel(){
+  const sa=document.getElementById('stats-area');
+  const badge=document.getElementById('rp-badge');
+  const legs=routeLegs[currentRoute];
+  const color=ROUTE_COLORS[currentRoute];
+  const label=currentRoute==='eco'?'🌿 Eco':'✦ Free';
+  if(!legs.length){
+    badge.textContent='—'; badge.style.color='var(--text-faint)';
+    sa.innerHTML='<div class="no-route">Add stops to see your route statistics in real time.</div>';
+    return;
+  }
+  const totalKm=legs.reduce((s,l)=>s+l.data.km,0);
+  const totalH=legs.reduce((s,l)=>s+l.data.hours,0);
+  const totalP=legs.reduce((s,l)=>s+l.data.price,0);
+  const totalCo2=legs.reduce((s,l)=>s+l.data.co2,0);
+  const allFlightCo2=Math.round(totalKm*.255);
+  const allCarCo2=Math.round(totalKm*.171);
+  const saved=Math.max(0,allFlightCo2-totalCo2);
+  const mx=Math.max(totalCo2,allCarCo2,allFlightCo2)||1;
+  const modes=[...new Set(legs.map(l=>l.mode))];
+  badge.textContent=label+' · '+legs.length+' leg'+(legs.length>1?'s':'');
+  badge.style.color=color;
+  sa.innerHTML=`
+    <div class="stats-grid" style="border-bottom:1px solid var(--border)">
+      <div class="stat-cell"><div class="stat-ico">⏱</div><div class="stat-val">${fH(totalH)}</div><div class="stat-desc">Travel time</div></div>
+      <div class="stat-cell"><div class="stat-ico">💶</div><div class="stat-val">~€${totalP}</div><div class="stat-desc">Est. cost</div></div>
+    </div>
+    <div class="stats-grid" style="border-bottom:1px solid var(--border)">
+      <div class="stat-cell"><div class="stat-ico">🌿</div><div class="stat-val">${Math.round(totalCo2)}<span class="stat-unit">kg</span></div><div class="stat-desc">CO₂ emitted</div></div>
+      <div class="stat-cell"><div class="stat-ico">🛤</div><div class="stat-val">${Math.round(totalKm)}<span class="stat-unit">km</span></div><div class="stat-desc">Distance</div></div>
+    </div>
+    <div style="padding:9px 15px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:5px;">
+      ${modes.map(m=>`<span class="wp-badge wb-${m}" style="font-size:9px;padding:3px 8px;">${MODE_ICON[m]} ${MODE_NAME[m]}</span>`).join('')}
+    </div>
+    <div class="co2-sec">
+      <div class="ps-label" style="margin-bottom:9px">CO₂ Comparison</div>
+      ${[['Your route',Math.round(totalCo2),color],['🚗 All car',allCarCo2,'#96AEBF'],['✈️ All flight',allFlightCo2,'#F0A050']].map(([n,v,c])=>`
+        <div class="co2-bar-wrap">
+          <div class="co2-bar-hd"><span class="co2-bar-name">${n}</span><span class="co2-bar-val">${v} kg</span></div>
+          <div class="co2-bar-track"><div class="co2-bar-fill" style="width:${(v/mx*100).toFixed(0)}%;background:${c}"></div></div>
+        </div>`).join('')}
+      ${saved>0?`<div class="save-badge">🌱 ${saved} kg saved vs all-flight</div>`:''}
+    </div>
+    <div class="legs-sec">
+      <div class="ps-label" style="margin-bottom:7px">Legs (${legs.length})</div>
+      ${legs.map(l=>`<div class="leg-row">
+        <div class="leg-cities">${MODE_ICON[l.mode]} <span>${l.from.replace('📌 ','')}</span><span class="leg-arrow">→</span><span>${l.to.replace('📌 ','')}</span></div>
+        <div class="leg-meta">
+          <span class="leg-badge lb-${l.mode}">${l.mode}</span>
+          <span>${fHr(l.data.hours)}</span><span>·</span>
+          <span style="color:${MODE_COLOR[l.mode]}">~€${l.data.price}</span><span>·</span>
+          <span>${Math.round(l.data.co2)} kg CO₂</span>
+        </div>
+      </div>`).join('')}
+    </div>
+    <div class="rp-note"><strong>Your choices.</strong> Stats based on March 2026 advance booking prices. Every decision is yours — no auto-routing.</div>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ACTIONS
+// ═══════════════════════════════════════════════════════════
+function undoLeg(){
+  if(pendingCity){cancelPending();return;}
+  const legs=routeLegs[currentRoute];
+  if(!legs.length) return;
+  const last=legs.pop();
+  if(customNodes[last.to]) delete customNodes[last.to];
+  redrawRoute(); updateWpList(); updatePanel();
+}
+function clearRoute(){
+  routeLegs[currentRoute]=[];
+  pendingCity=null; pendingFrom=null;
+  customNodes={}; dynamicNodes={}; freeWpCount=0;
+  document.getElementById('mode-picker').style.display='none';
+  redrawRoute(); updateWpList(); updatePanel(); toast('Route cleared.');
+}
+function saveCurrentRoute(){
+  const legs=routeLegs[currentRoute];
+  if(legs.length<1){toast('Add at least one leg first!');return;}
+  const totalCo2=legs.reduce((s,l)=>s+l.data.co2,0);
+  const totalP=legs.reduce((s,l)=>s+l.data.price,0);
+  const totalH=legs.reduce((s,l)=>s+l.data.hours,0);
+  const label=currentRoute==='eco'?'Eco Route':'Free Choice';
+  toast(`✓ ${label} saved — ${Math.round(totalCo2)} kg CO₂, ~€${totalP}, ${fHr(totalH)}`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════
+function exportPNG(){
+  toast('Generating PNG…');
+  const el=document.getElementById('map-svg'); const w=el.clientWidth,h=el.clientHeight;
+  const clone=el.cloneNode(true);
+  const st=document.createElement('style'); st.textContent='text{font-family:sans-serif;}';
+  clone.insertBefore(st,clone.firstChild);
+  const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)],{type:'image/svg+xml'}));
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas'); c.width=w*2; c.height=h*2;
+    const ctx=c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img,0,0); URL.revokeObjectURL(url);
+    c.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);
+      a.download=`${studentName.replace(' ','_')}_ECIU_Route.png`;a.click();toast('PNG downloaded!');});
+  }; img.src=url;
+}
+
+function copyStats(){
+  const ecoLegs=routeLegs.eco; const freeLegs=routeLegs.free;
+  const fmt=(legs,label)=>{
+    if(!legs.length) return `${label}: not planned yet`;
+    const km=legs.reduce((s,l)=>s+l.data.km,0);
+    const h=legs.reduce((s,l)=>s+l.data.hours,0);
+    const p=legs.reduce((s,l)=>s+l.data.price,0);
+    const co2=legs.reduce((s,l)=>s+l.data.co2,0);
+    const cities=[legs[0].from,...legs.map(l=>l.to)].join(' → ');
+    return `${label}:\n  Route: ${cities}\n  Time: ${fHr(h)} · Cost: ~€${p} · CO₂: ${Math.round(co2)} kg`;
+  };
+  const text=`ECIU Ambassador Challenge — ${studentName} (${studentUni})\n\n${fmt(ecoLegs,'🌿 Eco Route')}\n\n${fmt(freeLegs,'✦ Free Choice')}`;
+  navigator.clipboard.writeText(text).then(()=>toast('Route summary copied to clipboard!'))
+    .catch(()=>toast('Copy failed — use Export PNG instead'));
+}
+
+// ═══════════════════════════════════════════════════════════
+// MISC
+// ═══════════════════════════════════════════════════════════
+function hav(a,b,c,d){
+  const R=6371,dL=(c-a)*Math.PI/180,dl=(d-b)*Math.PI/180;
+  const x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dl/2)**2;
+  return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._t); t._t=setTimeout(()=>t.style.opacity='0',2600);
+}
+
+// ─── BOOT ──────────────────────────────────────────────────
+initMap();
+window.addEventListener('resize',()=>{
+  const w=document.getElementById('map-wrap').clientWidth;
+  const h=document.getElementById('map-wrap').clientHeight;
+  d3.select('#map-svg').attr('width',w).attr('height',h);
+});
+</script>
+</body>
+</html>
